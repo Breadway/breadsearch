@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  DL_DIR: /srv/breadway-dl
+  ECOSYSTEM_DIR: /tmp/bread-ecosystem-ci
+
+jobs:
+  build:
+    runs-on: [self-hosted, hestia]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install build deps
+        run: sudo apt-get install -y libgtk-4-dev librsvg2-dev libdbus-1-dev pkg-config 2>/dev/null || true
+
+      - name: build
+        run: cargo build --release --locked
+
+      - name: test
+        run: cargo test --release --locked --workspace
+
+      - name: prepare artifacts
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG_DIR="${DL_DIR}/breadsearch/${VERSION}"
+          mkdir -p "${PKG_DIR}"
+          for bin in breadsearch breadmill; do
+            cp "target/release/${bin}" "${PKG_DIR}/${bin}-x86_64"
+            strip "${PKG_DIR}/${bin}-x86_64"
+            sha256sum "${PKG_DIR}/${bin}-x86_64" | awk '{print $1}' \
+              > "${PKG_DIR}/${bin}-x86_64.sha256"
+          done
+          cp packaging/breadmill.service "${PKG_DIR}/"
+          cp config.example.toml "${PKG_DIR}/"
+          cp bakery.toml "${PKG_DIR}/bakery.toml"
+          ln -sfn "${VERSION}" "${DL_DIR}/breadsearch/latest"
+
+      - name: ensure bread-ecosystem
+        run: |
+          rm -rf "${ECOSYSTEM_DIR}"
+          git clone https://github.com/Breadway/bread-ecosystem.git "${ECOSYSTEM_DIR}"
+
+      - name: regenerate index.json
+        run: bash "${ECOSYSTEM_DIR}/scripts/gen-index.sh"
+
+      - name: upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG_DIR="${DL_DIR}/breadsearch/${VERSION}"
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "breadsearch v${VERSION}" --generate-notes 2>/dev/null || true
+          gh release upload "${GITHUB_REF_NAME}" \
+            "${PKG_DIR}/breadsearch-x86_64" \
+            "${PKG_DIR}/breadmill-x86_64" \
+            "${PKG_DIR}/breadsearch-x86_64.sha256" \
+            "${PKG_DIR}/breadmill-x86_64.sha256" \
+            --clobber
