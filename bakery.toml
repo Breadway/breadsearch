@@ -1,0 +1,18 @@
+name = "breadsearch"
+description = "Semantic system-wide search for BOS"
+binaries = ["breadsearch", "breadmill"]
+system_deps = ["gtk4", "gtk4-layer-shell", "librsvg"]
+bread_deps = []
+
+[[service]]
+unit = "breadmill.service"
+enable = true
+
+[config]
+dir = "~/.config/breadsearch"
+example = "config.example.toml"
+
+[install]
+post_install = [
+    "systemctl --user start breadmill.service 2>/dev/null || breadmill &",
+]

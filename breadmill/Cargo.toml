@@ -1,0 +1,55 @@
+[package]
+name = "breadmill"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[features]
+default = []
+npu = ["ort/vitis", "ort/load-dynamic"]
+rocm = ["ort/rocm", "ort/load-dynamic"]
+
+[[bin]]
+name = "breadmill"
+path = "src/main.rs"
+
+[dependencies]
+breadsearch-shared = { path = "../breadsearch-shared" }
+
+# Embedding: ONNX Runtime + HF tokenizers
+# download-binaries: fetches the MLAS-optimized ORT 1.24.x at build time (CPU default).
+# api-23: compatible with both the downloaded ORT 1.24.x and the Ryzen AI SDK ORT 1.23.3;
+#   ORT 1.24 is backwards-compatible and honours GetApi(23) requests.
+# npu feature adds load-dynamic + vitis: dlopen at runtime lets ORT_DYLIB_PATH redirect
+#   to the Ryzen AI SDK ORT; rpath from download-binaries means no ORT_DYLIB_PATH
+#   needed for the plain CPU path even in the npu build.
+ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-23"] }
+tokenizers = "0"
+
+# Vector index
+usearch = "2"
+
+# Metadata store
+rusqlite = { version = "0", features = ["bundled"] }
+
+# File walking (respects .gitignore)
+ignore = "0"
+
+# Live filesystem watching
+notify = "6"
+
+# Text extraction
+pdf-extract = "0"
+zip = "2"
+quick-xml = { version = "0", features = ["serialize"] }
+
+# Hashing
+sha2 = "0"
+hex = "0"
+
+# HTTP for model download
+ureq = "2"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

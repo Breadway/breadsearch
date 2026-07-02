@@ -1,0 +1,3 @@
+[workspace]
+members = ["breadsearch-shared", "breadmill", "breadsearch"]
+resolver = "2"

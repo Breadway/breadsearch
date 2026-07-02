@@ -1,0 +1,15 @@
+[Unit]
+Description=Breadmill semantic search indexer
+Documentation=https://github.com/breadway/breadsearch
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/breadmill
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

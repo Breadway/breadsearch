@@ -1,0 +1,41 @@
+# breadsearch configuration
+# Copy to ~/.config/breadsearch/config.toml
+
+[index]
+# Directories to crawl for documents
+roots = [
+    "~/Documents",
+    "~/Projects",
+    "~/.config/breadpad",
+]
+# File extensions to index
+extensions = ["md", "txt", "org", "pdf", "odt", "docx"]
+# Skip files larger than this (MB)
+max_file_mb = 10.0
+
+[search]
+# Default number of results
+limit = 10
+# Max characters in snippet
+snippet_len = 200
+
+[model]
+# Embedding model name (informational; breadmill uses the ONNX files it fetches)
+name = "nomic-embed-text-v1.5"
+# Embedding dimension
+dim = 768
+# Compute backend: "cpu" (default), "npu" (AMD XDNA via VitisAI EP), or
+# "rocm" (AMD iGPU/dGPU). NPU requires breadmill compiled with --features npu
+# and the AMD Ryzen AI SDK installed; ROCm requires --features rocm.
+# Override at runtime with: breadmill --npu / --rocm
+backend = "cpu"
+
+[power]
+# Master switch for indexing. When false, breadmill still answers queries
+# against the existing index but never embeds new/changed files.
+enabled = true
+# Embedding is the compute-heavy step. By default breadmill pauses indexing
+# while on battery and resumes automatically when AC power is reconnected.
+# Set true to index on battery too. Machines with no battery (desktops) are
+# always treated as on-power regardless of this setting.
+run_on_battery = false
