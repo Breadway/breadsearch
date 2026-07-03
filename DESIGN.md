@@ -80,7 +80,9 @@ Start from `breadbox/breadbox/src/main.rs`. **Reuse verbatim:** the gtk4-layer-s
 - nomic prefixes + mean-pool + normalize must match between index and query or recall collapses.
 - `ort` linking: prefer the crate's downloaded/bundled ONNX Runtime to avoid version skew with Arch's `onnxruntime`.
 - Office formats (docx/odt) are best-effort in v1; md/txt/org/pdf are the reliable path.
-- GPU EPs (ROCm/CUDA) fail to register silently at the ONNX Runtime level and fall back to CPU — always check
-  startup logs for `Successfully registered` before trusting a GPU build is actually accelerating. See
+- GPU EPs (ROCm/CUDA/OpenVINO) fail to register silently at the ONNX Runtime level and fall back to CPU — always
+  check startup logs for `Successfully registered` before trusting a GPU build is actually accelerating. See
   [README: GPU backend notes](README.md#gpu-backend-notes) for the MIGraphX-vs-ROCMExecutionProvider distinction
   and the per-shape JIT-compile-and-cache behavior that matters for interactive query latency.
+- CUDA and OpenVINO are compile-checked only — no NVIDIA or Intel GPU hardware in this dev environment (AMD-only)
+  to runtime-verify against, unlike ROCm which was confirmed end-to-end on real hardware.

@@ -129,7 +129,8 @@ pub struct ModelConfig {
     pub name: String,
     #[serde(default = "default_dim")]
     pub dim: usize,
-    /// Compute backend: "cpu", "npu" (VitisAI/XDNA), "rocm" (MIGraphX/AMD GPU), or "cuda" (NVIDIA GPU).
+    /// Compute backend: "cpu", "npu" (VitisAI/XDNA), "rocm" (MIGraphX/AMD GPU),
+    /// "cuda" (NVIDIA GPU), or "openvino" (Intel iGPU/dGPU).
     #[serde(default = "default_backend")]
     pub backend: String,
 }

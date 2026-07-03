@@ -27,6 +27,11 @@ pub enum Backend {
     Rocm,
     /// NVIDIA GPU via the CUDA ONNX Runtime execution provider.
     Cuda,
+    /// Intel iGPU/dGPU (Arc) via the OpenVINO ONNX Runtime execution
+    /// provider, requesting device_type "GPU". `cache_dir` stores OpenVINO's
+    /// compiled-model blobs between runs (its own `with_cache_dir`, not an
+    /// env var — unlike MIGraphX this doesn't need a workaround).
+    OpenVino { cache_dir: PathBuf },
 }
 
 pub struct OrtEmbedder {
@@ -165,6 +170,7 @@ fn configure_eps(builder: SessionBuilder, backend: &Backend) -> Result<SessionBu
         Backend::Npu { cache_dir } => npu_session(builder, cache_dir),
         Backend::Rocm => rocm_session(builder),
         Backend::Cuda => cuda_session(builder),
+        Backend::OpenVino { cache_dir } => openvino_session(builder, cache_dir),
     }
 }
 
@@ -250,6 +256,36 @@ fn cuda_session(builder: SessionBuilder) -> Result<SessionBuilder, String> {
 #[cfg(not(feature = "cuda"))]
 fn cuda_session(builder: SessionBuilder) -> Result<SessionBuilder, String> {
     eprintln!("breadmill: CUDA backend requested but not compiled in (rebuild with --features cuda); using CPU");
+    Ok(builder)
+}
+
+// ---- OpenVINO EP (Intel iGPU/dGPU) -------------------------------------------
+
+#[cfg(feature = "openvino")]
+fn openvino_session(builder: SessionBuilder, cache_dir: &Path) -> Result<SessionBuilder, String> {
+    let ov_cache = cache_dir.join("openvino");
+    std::fs::create_dir_all(&ov_cache).map_err(|e| e.to_string())?;
+    eprintln!("breadmill: using OpenVINO execution provider (device_type GPU)");
+    eprintln!("breadmill: OpenVINO model cache: {}", ov_cache.display());
+    eprintln!(
+        "breadmill: note — check the log line above/below for \"Successfully registered \
+         `OpenVINOExecutionProvider`\"; if it's missing, the ONNX Runtime in use wasn't built \
+         with OpenVINO support and inference silently fell back to CPU"
+    );
+    builder
+        .with_execution_providers([
+            ort::ep::OpenVINO::default()
+                .with_device_type("GPU")
+                .with_cache_dir(ov_cache.to_string_lossy())
+                .build(),
+            ort::ep::CPU::default().build(),
+        ])
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(not(feature = "openvino"))]
+fn openvino_session(builder: SessionBuilder, _cache_dir: &Path) -> Result<SessionBuilder, String> {
+    eprintln!("breadmill: OpenVINO backend requested but not compiled in (rebuild with --features openvino); using CPU");
     Ok(builder)
 }
 

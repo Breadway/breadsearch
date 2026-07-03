@@ -8,7 +8,8 @@ Type=simple
 # Required (not just a perf tweak) when backend = "rocm": without a valid
 # cache dir, ONNX Runtime's MIGraphX EP reads an uninitialized cache path and
 # crashes on the first query instead of just recompiling every restart. Inert
-# for cpu/npu/cuda backends. See README.md#gpu-backend-notes.
+# for cpu/npu/cuda/openvino backends (openvino's cache dir is set in code,
+# not via env var). See README.md#gpu-backend-notes.
 Environment=ORT_MIGRAPHX_MODEL_CACHE_PATH=%h/.cache/breadsearch/migraphx-cache
 ExecStart=%h/.cargo/bin/breadmill
 Restart=on-failure

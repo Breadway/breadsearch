@@ -39,12 +39,14 @@ fn main() {
     let use_npu = raw_args.iter().any(|a| a == "--npu");
     let use_rocm = raw_args.iter().any(|a| a == "--rocm");
     let use_cuda = raw_args.iter().any(|a| a == "--cuda");
+    let use_openvino = raw_args.iter().any(|a| a == "--openvino");
 
     // Build a view of argv without backend flags for command matching.
+    let backend_flags = ["--npu", "--rocm", "--cuda", "--openvino"];
     let args: Vec<&str> = raw_args
         .iter()
         .skip(1)
-        .filter(|a| a.as_str() != "--npu" && a.as_str() != "--rocm" && a.as_str() != "--cuda")
+        .filter(|a| !backend_flags.contains(&a.as_str()))
         .map(|s| s.as_str())
         .collect();
 
@@ -59,7 +61,7 @@ fn main() {
             }
         }
         Some("--reindex") | Some("reindex") => {
-            if let Err(e) = run_daemon(true, use_npu, use_rocm, use_cuda) {
+            if let Err(e) = run_daemon(true, use_npu, use_rocm, use_cuda, use_openvino) {
                 eprintln!("breadmill: {}", e);
                 std::process::exit(1);
             }
@@ -76,7 +78,7 @@ fn main() {
             cli_status();
         }
         None | Some("serve") | Some("--serve") => {
-            if let Err(e) = run_daemon(false, use_npu, use_rocm, use_cuda) {
+            if let Err(e) = run_daemon(false, use_npu, use_rocm, use_cuda, use_openvino) {
                 eprintln!("breadmill: {}", e);
                 std::process::exit(1);
             }
@@ -84,7 +86,7 @@ fn main() {
         Some(cmd) => {
             eprintln!("breadmill: unknown command: {}", cmd);
             eprintln!(
-                "usage: breadmill [serve|reindex|fetch-model|query <text>|status] [--npu|--rocm|--cuda] [--version]"
+                "usage: breadmill [serve|reindex|fetch-model|query <text>|status] [--npu|--rocm|--cuda|--openvino] [--version]"
             );
             std::process::exit(1);
         }
@@ -93,7 +95,13 @@ fn main() {
 
 // ---- Daemon -----------------------------------------------------------------
 
-fn run_daemon(force_reindex: bool, use_npu: bool, use_rocm: bool, use_cuda: bool) -> Result<(), String> {
+fn run_daemon(
+    force_reindex: bool,
+    use_npu: bool,
+    use_rocm: bool,
+    use_cuda: bool,
+    use_openvino: bool,
+) -> Result<(), String> {
     let config = breadsearch_shared::Config::load();
     let state_dir = breadsearch_shared::state_dir();
     let cache_dir = breadsearch_shared::cache_dir();
@@ -115,6 +123,8 @@ fn run_daemon(force_reindex: bool, use_npu: bool, use_rocm: bool, use_cuda: bool
         "rocm"
     } else if use_cuda {
         "cuda"
+    } else if use_openvino {
+        "openvino"
     } else {
         config.model.backend.as_str()
     };
@@ -131,6 +141,10 @@ fn run_daemon(force_reindex: bool, use_npu: bool, use_rocm: bool, use_cuda: bool
         "cuda" => {
             eprintln!("breadmill: CUDA backend selected");
             Backend::Cuda
+        }
+        "openvino" => {
+            eprintln!("breadmill: OpenVINO backend selected");
+            Backend::OpenVino { cache_dir: cache_dir.clone() }
         }
         _ => Backend::Cpu,
     };

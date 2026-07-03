@@ -1,6 +1,6 @@
 [package]
 name = "breadmill"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "MIT"
 
@@ -14,13 +14,17 @@ npu = ["ort/vitis", "ort/load-dynamic"]
 # libonnxruntime_providers_rocm.so, which most distros don't package.
 rocm = ["ort/migraphx", "ort/load-dynamic"]
 cuda = ["ort/cuda", "ort/load-dynamic"]
+# Intel iGPU/dGPU (Arc) + CPU via OpenVINO. One EP covers Intel's whole
+# hardware line by device_type string ("CPU"/"GPU"/"GPU.0"/"NPU"/"HETERO:...");
+# we always request "GPU" since CPU is already covered by the cpu backend.
+openvino = ["ort/openvino", "ort/load-dynamic"]
 # All backends in one binary. Safe to combine: every backend here uses
 # ort's load-dynamic (dlopen) mode, so none of this links against an actual
-# NPU/ROCm/CUDA toolkit at build time — which ONNX Runtime actually gets
-# loaded (and thus which EPs are really available) is decided at runtime by
-# ORT_DYLIB_PATH / the dynamic linker, per the --npu/--rocm/--cuda flag or
-# `backend` config value in use for that run.
-full = ["npu", "rocm", "cuda"]
+# NPU/ROCm/CUDA/OpenVINO toolkit at build time — which ONNX Runtime actually
+# gets loaded (and thus which EPs are really available) is decided at
+# runtime by ORT_DYLIB_PATH / the dynamic linker, per the --npu/--rocm/
+# --cuda/--openvino flag or `backend` config value in use for that run.
+full = ["npu", "rocm", "cuda", "openvino"]
 
 [[bin]]
 name = "breadmill"

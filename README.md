@@ -21,10 +21,11 @@ Optional features:
 
 | Feature | What it adds |
 |---------|-------------|
-| `npu`   | AMD XDNA NPU via VitisAI ONNX Runtime EP (requires Ryzen AI SDK) |
-| `rocm`  | AMD iGPU via the MIGraphX ONNX Runtime EP (ROCm-backed) |
-| `cuda`  | NVIDIA GPU via the CUDA ONNX Runtime EP |
-| `full`  | All three of the above in one binary |
+| `npu`      | AMD XDNA NPU via VitisAI ONNX Runtime EP (requires Ryzen AI SDK) |
+| `rocm`     | AMD iGPU via the MIGraphX ONNX Runtime EP (ROCm-backed) |
+| `cuda`     | NVIDIA GPU via the CUDA ONNX Runtime EP |
+| `openvino` | Intel iGPU/dGPU (Arc) via the OpenVINO ONNX Runtime EP |
+| `full`     | All four of the above in one binary |
 
 ```
 # NPU build
@@ -36,25 +37,29 @@ cargo build --release -p breadmill --features rocm
 # CUDA (NVIDIA GPU) build
 cargo build --release -p breadmill --features cuda
 
+# OpenVINO (Intel iGPU/dGPU) build
+cargo build --release -p breadmill --features openvino
+
 # All backends in one binary (what the release build ships)
 cargo build --release -p breadmill --features full
 ```
 
-`rocm`/`cuda`/`npu` all use `ort`'s `load-dynamic` mode: at runtime, breadmill
-dlopens whatever `libonnxruntime.so` the dynamic linker resolves (or
+`rocm`/`cuda`/`npu`/`openvino` all use `ort`'s `load-dynamic` mode: at runtime,
+breadmill dlopens whatever `libonnxruntime.so` the dynamic linker resolves (or
 `ORT_DYLIB_PATH` if set). GPU acceleration only works if that ONNX Runtime
 build actually has the matching execution provider compiled in — breadmill
 logs a clear `Successfully registered` / `not enabled in this build` line for
 this at startup (see [GPU backend notes](#gpu-backend-notes) below).
 
-Because all three are dlopen-based, `full` doesn't require the NPU/ROCm/CUDA
-toolkits to be installed at build time — only at run time, and only for
-whichever single backend you actually select via `--npu`/`--rocm`/`--cuda`
-or `backend` in config.toml. The **released binaries are built with
-`full`**: same binary works CPU-only out of the box, and picks up NPU/ROCm/CUDA
-acceleration on a machine that has the matching ONNX Runtime available,
-without needing a different download. An explicit `--npu`/`--rocm`/`--cuda`
-flag always overrides `backend` in config.toml, not the other way around.
+Because all four are dlopen-based, `full` doesn't require the NPU/ROCm/CUDA/
+OpenVINO toolkits to be installed at build time — only at run time, and only
+for whichever single backend you actually select via
+`--npu`/`--rocm`/`--cuda`/`--openvino` or `backend` in config.toml. The
+**released binaries are built with `full`**: same binary works CPU-only out
+of the box, and picks up NPU/ROCm/CUDA/OpenVINO acceleration on a machine
+that has the matching ONNX Runtime available, without needing a different
+download. An explicit `--npu`/`--rocm`/`--cuda`/`--openvino` flag always
+overrides `backend` in config.toml, not the other way around.
 
 ## Setup
 
@@ -117,6 +122,7 @@ breadmill status
 breadmill --npu
 breadmill --rocm
 breadmill --cuda
+breadmill --openvino
 ```
 
 ## Config
@@ -137,7 +143,7 @@ snippet_len  = 200         # max characters in result snippet
 [model]
 name         = "nomic-embed-text-v1.5"
 dim          = 768
-backend      = "cpu"       # "cpu", "npu", "rocm", or "cuda"
+backend      = "cpu"       # "cpu", "npu", "rocm", "cuda", or "openvino"
 ```
 
 `roots` and `excludes` support `~/` expansion. The index respects `.gitignore` files found during the walk.
@@ -154,10 +160,11 @@ Set `backend = "npu"` in config (or pass `--npu`) when running a build compiled 
 
 ### GPU backend notes
 
-Both `rocm` and `cuda` need a system ONNX Runtime that was actually built with
-the matching execution provider — the crate's own downloaded binary is CPU-only.
-Point `ORT_DYLIB_PATH` at one, or install a distro package that provides
-`libonnxruntime.so` with the EP baked in and let the dynamic linker find it.
+`rocm`, `cuda`, and `openvino` all need a system ONNX Runtime that was
+actually built with the matching execution provider — the crate's own
+downloaded binary is CPU-only. Point `ORT_DYLIB_PATH` at one, or install a
+distro package that provides `libonnxruntime.so` with the EP baked in and
+let the dynamic linker find it.
 
 **ROCm (`--rocm` / `backend = "rocm"`)** targets ONNX Runtime's **MIGraphX**
 execution provider, not the classic `ROCMExecutionProvider`. Distro
@@ -182,6 +189,18 @@ noticeable for interactive query embedding.
 `CUDAExecutionProvider` and needs a CUDA-enabled ONNX Runtime + a working
 CUDA/cuDNN install. Unverified on real NVIDIA hardware in this repo — only
 compile-checked, since development happened on an AMD-only machine.
+
+**OpenVINO (`--openvino` / `backend = "openvino"`)** targets
+`OpenVINOExecutionProvider` with `device_type = "GPU"`, covering both Intel
+iGPUs and Arc dGPUs through the same EP (OpenVINO abstracts Intel's whole
+hardware line — CPU/GPU/NPU — behind one provider and a device-type string).
+Needs an OpenVINO-enabled ONNX Runtime and the OpenVINO runtime itself
+installed. Its options go through a generic key/value FFI interface rather
+than a fixed C struct (unlike MIGraphX's `OrtMIGraphXProviderOptions`), so it
+should be less exposed to the kind of ABI-version-skew crash MIGraphX hit —
+but that's inference from reading the EP's design, not something verified
+against real Intel GPU hardware. Also unverified on real hardware in this
+repo — only compile-checked, for the same reason as CUDA.
 
 ## Runtime paths
 
