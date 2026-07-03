@@ -5,10 +5,11 @@ After=default.target
 
 [Service]
 Type=simple
-# Uncomment if built with --features rocm: persists MIGraphX's compiled-kernel
-# cache across restarts (each new sequence length otherwise costs a ~60-120s
-# recompile). See README.md#gpu-backend-notes.
-#Environment=ORT_MIGRAPHX_MODEL_CACHE_PATH=%h/.cache/breadsearch/migraphx-cache
+# Required (not just a perf tweak) when backend = "rocm": without a valid
+# cache dir, ONNX Runtime's MIGraphX EP reads an uninitialized cache path and
+# crashes on the first query instead of just recompiling every restart. Inert
+# for cpu/npu/cuda backends. See README.md#gpu-backend-notes.
+Environment=ORT_MIGRAPHX_MODEL_CACHE_PATH=%h/.cache/breadsearch/migraphx-cache
 ExecStart=%h/.cargo/bin/breadmill
 Restart=on-failure
 RestartSec=5
