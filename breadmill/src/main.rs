@@ -24,17 +24,27 @@ const TOKENIZER_URL: &str =
     "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/tokenizer.json";
 
 fn main() {
+    // Surfaces ort's EP-registration warnings/errors (e.g. a GPU EP silently
+    // falling back to CPU) by default, without requiring RUST_LOG to be set.
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn,ort=info")),
+        )
+        .init();
+
     let raw_args: Vec<String> = std::env::args().collect();
 
     // Extract global flags before command dispatch.
     let use_npu = raw_args.iter().any(|a| a == "--npu");
     let use_rocm = raw_args.iter().any(|a| a == "--rocm");
+    let use_cuda = raw_args.iter().any(|a| a == "--cuda");
 
     // Build a view of argv without backend flags for command matching.
     let args: Vec<&str> = raw_args
         .iter()
         .skip(1)
-        .filter(|a| a.as_str() != "--npu" && a.as_str() != "--rocm")
+        .filter(|a| a.as_str() != "--npu" && a.as_str() != "--rocm" && a.as_str() != "--cuda")
         .map(|s| s.as_str())
         .collect();
 
@@ -49,7 +59,7 @@ fn main() {
             }
         }
         Some("--reindex") | Some("reindex") => {
-            if let Err(e) = run_daemon(true, use_npu, use_rocm) {
+            if let Err(e) = run_daemon(true, use_npu, use_rocm, use_cuda) {
                 eprintln!("breadmill: {}", e);
                 std::process::exit(1);
             }
@@ -66,7 +76,7 @@ fn main() {
             cli_status();
         }
         None | Some("serve") | Some("--serve") => {
-            if let Err(e) = run_daemon(false, use_npu, use_rocm) {
+            if let Err(e) = run_daemon(false, use_npu, use_rocm, use_cuda) {
                 eprintln!("breadmill: {}", e);
                 std::process::exit(1);
             }
@@ -74,7 +84,7 @@ fn main() {
         Some(cmd) => {
             eprintln!("breadmill: unknown command: {}", cmd);
             eprintln!(
-                "usage: breadmill [serve|reindex|fetch-model|query <text>|status] [--npu|--rocm] [--version]"
+                "usage: breadmill [serve|reindex|fetch-model|query <text>|status] [--npu|--rocm|--cuda] [--version]"
             );
             std::process::exit(1);
         }
@@ -83,7 +93,7 @@ fn main() {
 
 // ---- Daemon -----------------------------------------------------------------
 
-fn run_daemon(force_reindex: bool, use_npu: bool, use_rocm: bool) -> Result<(), String> {
+fn run_daemon(force_reindex: bool, use_npu: bool, use_rocm: bool, use_cuda: bool) -> Result<(), String> {
     let config = breadsearch_shared::Config::load();
     let state_dir = breadsearch_shared::state_dir();
     let cache_dir = breadsearch_shared::cache_dir();
@@ -101,6 +111,9 @@ fn run_daemon(force_reindex: bool, use_npu: bool, use_rocm: bool) -> Result<(), 
     } else if use_rocm || config.model.backend == "rocm" {
         eprintln!("breadmill: ROCm backend selected");
         Backend::Rocm
+    } else if use_cuda || config.model.backend == "cuda" {
+        eprintln!("breadmill: CUDA backend selected");
+        Backend::Cuda
     } else {
         Backend::Cpu
     };

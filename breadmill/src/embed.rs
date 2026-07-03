@@ -19,8 +19,14 @@ pub enum Backend {
     /// AMD XDNA NPU via the VitisAI ONNX Runtime execution provider.
     /// `cache_dir` is used to store the compiled NPU model between runs.
     Npu { cache_dir: PathBuf },
-    /// AMD iGPU via the ROCm ONNX Runtime execution provider.
+    /// AMD iGPU via the MIGraphX ONNX Runtime execution provider (ROCm-backed).
+    /// Distro ROCm ONNX Runtime builds (e.g. Arch's onnxruntime-rocm) are
+    /// commonly compiled with `--use_migraphx`, not `--use_rocm`, so this
+    /// targets `MIGraphXExecutionProvider` rather than the classic
+    /// `ROCMExecutionProvider`.
     Rocm,
+    /// NVIDIA GPU via the CUDA ONNX Runtime execution provider.
+    Cuda,
 }
 
 pub struct OrtEmbedder {
@@ -108,11 +114,14 @@ impl OrtEmbedder {
         let actual_seq = shape[1] as usize;
         let actual_dim = shape[2] as usize;
 
-        // Mean-pool over non-padding positions
+        // Mean-pool over non-padding positions. Some execution providers (e.g.
+        // MIGraphX) pad the output sequence dimension for kernel efficiency, so
+        // actual_seq can exceed mask.len() — only positions covered by our own
+        // attention mask are meaningful, so cap the loop at whichever is shorter.
         let mut result = vec![0.0f32; actual_dim];
         let mut count = 0usize;
 
-        for t in 0..actual_seq {
+        for t in 0..actual_seq.min(mask.len()) {
             if mask[t] > 0 {
                 for d in 0..actual_dim {
                     result[d] += data[t * actual_dim + d];
@@ -155,6 +164,7 @@ fn configure_eps(builder: SessionBuilder, backend: &Backend) -> Result<SessionBu
         Backend::Cpu => Ok(builder),
         Backend::Npu { cache_dir } => npu_session(builder, cache_dir),
         Backend::Rocm => rocm_session(builder),
+        Backend::Cuda => cuda_session(builder),
     }
 }
 
@@ -195,14 +205,19 @@ fn build_vitis_ep(cache_dir: &Path) -> Result<ort::ep::ExecutionProviderDispatch
         .build())
 }
 
-// ---- ROCm EP (AMD iGPU) -----------------------------------------------------
+// ---- MIGraphX EP (AMD iGPU, ROCm-backed) -------------------------------------
 
 #[cfg(feature = "rocm")]
 fn rocm_session(builder: SessionBuilder) -> Result<SessionBuilder, String> {
-    eprintln!("breadmill: using ROCm execution provider (device 0)");
+    eprintln!("breadmill: using MIGraphX execution provider (device 0)");
+    eprintln!(
+        "breadmill: note — check the log line above/below for \"Successfully registered \
+         `MIGraphXExecutionProvider`\"; if it's missing, the ONNX Runtime in use wasn't built \
+         with MIGraphX support and inference silently fell back to CPU"
+    );
     builder
         .with_execution_providers([
-            ort::execution_providers::ROCmExecutionProvider::default().build(),
+            ort::ep::MIGraphX::default().with_device_id(0).build(),
             ort::ep::CPU::default().build(),
         ])
         .map_err(|e| e.to_string())
@@ -211,6 +226,30 @@ fn rocm_session(builder: SessionBuilder) -> Result<SessionBuilder, String> {
 #[cfg(not(feature = "rocm"))]
 fn rocm_session(builder: SessionBuilder) -> Result<SessionBuilder, String> {
     eprintln!("breadmill: ROCm backend requested but not compiled in (rebuild with --features rocm); using CPU");
+    Ok(builder)
+}
+
+// ---- CUDA EP (NVIDIA GPU) ----------------------------------------------------
+
+#[cfg(feature = "cuda")]
+fn cuda_session(builder: SessionBuilder) -> Result<SessionBuilder, String> {
+    eprintln!("breadmill: using CUDA execution provider (device 0)");
+    eprintln!(
+        "breadmill: note — check the log line above/below for \"Successfully registered \
+         `CUDAExecutionProvider`\"; if it's missing, the ONNX Runtime in use wasn't built \
+         with CUDA support and inference silently fell back to CPU"
+    );
+    builder
+        .with_execution_providers([
+            ort::ep::CUDA::default().with_device_id(0).build(),
+            ort::ep::CPU::default().build(),
+        ])
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(not(feature = "cuda"))]
+fn cuda_session(builder: SessionBuilder) -> Result<SessionBuilder, String> {
+    eprintln!("breadmill: CUDA backend requested but not compiled in (rebuild with --features cuda); using CPU");
     Ok(builder)
 }
 

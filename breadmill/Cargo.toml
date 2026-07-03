@@ -1,13 +1,19 @@
 [package]
 name = "breadmill"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 
 [features]
 default = []
 npu = ["ort/vitis", "ort/load-dynamic"]
-rocm = ["ort/rocm", "ort/load-dynamic"]
+# "rocm" targets the MIGraphX execution provider, not ONNX Runtime's classic
+# ROCMExecutionProvider (--use_rocm build). Distro ROCm-enabled ONNX Runtime
+# packages (e.g. Arch's onnxruntime-rocm) are commonly built with --use_migraphx
+# instead; the classic ROCm EP needs a bespoke --use_rocm build that ships
+# libonnxruntime_providers_rocm.so, which most distros don't package.
+rocm = ["ort/migraphx", "ort/load-dynamic"]
+cuda = ["ort/cuda", "ort/load-dynamic"]
 
 [[bin]]
 name = "breadmill"
@@ -25,6 +31,10 @@ breadsearch-shared = { path = "../breadsearch-shared" }
 #   needed for the plain CPU path even in the npu build.
 ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-23"] }
 tokenizers = "0"
+
+# Surfaces ort's own EP-registration tracing (e.g. a GPU EP silently failing to
+# register and falling back to CPU) as visible log output instead of nowhere.
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Vector index
 usearch = "2"

@@ -22,12 +22,26 @@ Optional features:
 | Feature | What it adds |
 |---------|-------------|
 | `npu`   | AMD XDNA NPU via VitisAI ONNX Runtime EP (requires Ryzen AI SDK) |
-| `rocm`  | AMD iGPU via ROCm ONNX Runtime EP |
+| `rocm`  | AMD iGPU via the MIGraphX ONNX Runtime EP (ROCm-backed) |
+| `cuda`  | NVIDIA GPU via the CUDA ONNX Runtime EP |
 
 ```
 # NPU build
 cargo build --release -p breadmill --features npu
+
+# ROCm (AMD iGPU/dGPU) build
+cargo build --release -p breadmill --features rocm
+
+# CUDA (NVIDIA GPU) build
+cargo build --release -p breadmill --features cuda
 ```
+
+`rocm`/`cuda`/`npu` all use `ort`'s `load-dynamic` mode: at runtime, breadmill
+dlopens whatever `libonnxruntime.so` the dynamic linker resolves (or
+`ORT_DYLIB_PATH` if set). GPU acceleration only works if that ONNX Runtime
+build actually has the matching execution provider compiled in — breadmill
+logs a clear `Successfully registered` / `not enabled in this build` line for
+this at startup (see [GPU backend notes](#gpu-backend-notes) below).
 
 ## Setup
 
@@ -89,6 +103,7 @@ breadmill status
 # Backend flags (requires the matching Cargo feature)
 breadmill --npu
 breadmill --rocm
+breadmill --cuda
 ```
 
 ## Config
@@ -109,7 +124,7 @@ snippet_len  = 200         # max characters in result snippet
 [model]
 name         = "nomic-embed-text-v1.5"
 dim          = 768
-backend      = "cpu"       # "cpu", "npu", or "rocm"
+backend      = "cpu"       # "cpu", "npu", "rocm", or "cuda"
 ```
 
 `roots` and `excludes` support `~/` expansion. The index respects `.gitignore` files found during the walk.
@@ -123,6 +138,37 @@ Set `backend = "npu"` in config (or pass `--npu`) when running a build compiled 
 3. `~/.local/share/ryzen-ai-1.7.1/voe-4.0-linux_x86_64/vaip_config.json`
 4. `/etc/vaip_config.json`
 5. `/opt/xilinx/vaip_config.json`
+
+### GPU backend notes
+
+Both `rocm` and `cuda` need a system ONNX Runtime that was actually built with
+the matching execution provider — the crate's own downloaded binary is CPU-only.
+Point `ORT_DYLIB_PATH` at one, or install a distro package that provides
+`libonnxruntime.so` with the EP baked in and let the dynamic linker find it.
+
+**ROCm (`--rocm` / `backend = "rocm"`)** targets ONNX Runtime's **MIGraphX**
+execution provider, not the classic `ROCMExecutionProvider`. Distro
+ROCm-enabled ONNX Runtime packages (e.g. Arch's `onnxruntime-rocm`) are
+commonly built with `--use_migraphx` rather than `--use_rocm`, so this is the
+EP that's actually available in practice; the classic ROCm EP needs a bespoke
+`--use_rocm` build most distros don't package. Startup logs a
+`Successfully registered `MIGraphXExecutionProvider`` line when it's really
+active — check for it if in doubt, since a failed GPU EP registration falls
+back to CPU silently at the ONNX Runtime level (breadmill's own log line is
+only a statement of intent, not a confirmation).
+
+MIGraphX JIT-compiles the model per distinct input sequence length and caches
+the compiled kernel to disk (each compile takes ~60–120s and produces a
+~500MB `.mxr` file). Set `ORT_MIGRAPHX_MODEL_CACHE_PATH=/path/to/cache` so
+that cost is paid once per shape instead of on every daemon restart. Because
+query text length varies, expect an occasional multi-second stall the first
+time a new token length is seen — fine for background document indexing,
+noticeable for interactive query embedding.
+
+**CUDA (`--cuda` / `backend = "cuda"`)** targets the standard
+`CUDAExecutionProvider` and needs a CUDA-enabled ONNX Runtime + a working
+CUDA/cuDNN install. Unverified on real NVIDIA hardware in this repo — only
+compile-checked, since development happened on an AMD-only machine.
 
 ## Runtime paths
 
