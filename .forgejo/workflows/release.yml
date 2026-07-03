@@ -1,0 +1,62 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: [self-hosted, hestia]
+    steps:
+      - name: checkout
+        run: |
+          set -euo pipefail
+          rm -rf src && mkdir src
+          git clone --branch "${GITHUB_REF_NAME}" --depth 1 \
+            "https://git.breadway.dev/${GITHUB_REPOSITORY}.git" src
+
+      - name: build
+        run: cd src && cargo build --release --locked
+
+      - name: test
+        run: cd src && cargo test --release --locked --workspace
+
+      - name: prepare artifacts
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG_DIR="/srv/breadway-dl/breadsearch/${VERSION}"
+          mkdir -p "${PKG_DIR}"
+          for bin in breadsearch breadmill; do
+            cp "src/target/release/${bin}" "${PKG_DIR}/${bin}-x86_64"
+            strip "${PKG_DIR}/${bin}-x86_64"
+            sha256sum "${PKG_DIR}/${bin}-x86_64" | awk '{print $1}' \
+              > "${PKG_DIR}/${bin}-x86_64.sha256"
+          done
+          cp src/packaging/breadmill.service "${PKG_DIR}/"
+          cp src/config.example.toml "${PKG_DIR}/"
+          cp src/bakery.toml "${PKG_DIR}/bakery.toml"
+          ln -sfn "${VERSION}" "/srv/breadway-dl/breadsearch/latest"
+
+      - name: regenerate index.json
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/bread-ecosystem-ci
+          git clone https://git.breadway.dev/Breadway/bread-ecosystem.git /tmp/bread-ecosystem-ci
+          bash /tmp/bread-ecosystem-ci/scripts/gen-index.sh
+
+      - name: upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG_DIR="/srv/breadway-dl/breadsearch/${VERSION}"
+          gh release create "${GITHUB_REF_NAME}" --repo Breadway/breadsearch \
+            --title "breadsearch v${VERSION}" --generate-notes 2>/dev/null || true
+          gh release upload "${GITHUB_REF_NAME}" --repo Breadway/breadsearch \
+            "${PKG_DIR}/breadsearch-x86_64" \
+            "${PKG_DIR}/breadmill-x86_64" \
+            "${PKG_DIR}/breadsearch-x86_64.sha256" \
+            "${PKG_DIR}/breadmill-x86_64.sha256" \
+            --clobber
