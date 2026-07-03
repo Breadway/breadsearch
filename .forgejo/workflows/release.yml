@@ -16,10 +16,15 @@ jobs:
             "https://git.breadway.dev/${GITHUB_REPOSITORY}.git" src
 
       - name: build
-        run: cd src && cargo build --release --locked
+        # --features full (breadmill's npu+rocm+cuda combined) ships one binary
+        # that can use any backend at runtime via --npu/--rocm/--cuda or
+        # `backend` in config.toml. All three are ort load-dynamic (dlopen)
+        # EPs, so this doesn't require the NPU/ROCm/CUDA toolkits to be
+        # present on the build host — see breadmill/Cargo.toml.
+        run: cd src && cargo build --release --locked --workspace --features full
 
       - name: test
-        run: cd src && cargo test --release --locked --workspace
+        run: cd src && cargo test --release --locked --workspace --features full
 
       - name: prepare artifacts
         run: |

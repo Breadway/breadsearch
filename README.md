@@ -24,6 +24,7 @@ Optional features:
 | `npu`   | AMD XDNA NPU via VitisAI ONNX Runtime EP (requires Ryzen AI SDK) |
 | `rocm`  | AMD iGPU via the MIGraphX ONNX Runtime EP (ROCm-backed) |
 | `cuda`  | NVIDIA GPU via the CUDA ONNX Runtime EP |
+| `full`  | All three of the above in one binary |
 
 ```
 # NPU build
@@ -34,6 +35,9 @@ cargo build --release -p breadmill --features rocm
 
 # CUDA (NVIDIA GPU) build
 cargo build --release -p breadmill --features cuda
+
+# All backends in one binary (what the release build ships)
+cargo build --release -p breadmill --features full
 ```
 
 `rocm`/`cuda`/`npu` all use `ort`'s `load-dynamic` mode: at runtime, breadmill
@@ -42,6 +46,15 @@ dlopens whatever `libonnxruntime.so` the dynamic linker resolves (or
 build actually has the matching execution provider compiled in — breadmill
 logs a clear `Successfully registered` / `not enabled in this build` line for
 this at startup (see [GPU backend notes](#gpu-backend-notes) below).
+
+Because all three are dlopen-based, `full` doesn't require the NPU/ROCm/CUDA
+toolkits to be installed at build time — only at run time, and only for
+whichever single backend you actually select via `--npu`/`--rocm`/`--cuda`
+or `backend` in config.toml. The **released binaries are built with
+`full`**: same binary works CPU-only out of the box, and picks up NPU/ROCm/CUDA
+acceleration on a machine that has the matching ONNX Runtime available,
+without needing a different download. An explicit `--npu`/`--rocm`/`--cuda`
+flag always overrides `backend` in config.toml, not the other way around.
 
 ## Setup
 

@@ -105,17 +105,34 @@ fn run_daemon(force_reindex: bool, use_npu: bool, use_rocm: bool, use_cuda: bool
     std::fs::create_dir_all(&state_dir).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
 
-    let backend = if use_npu || config.model.backend == "npu" {
-        eprintln!("breadmill: NPU backend selected");
-        Backend::Npu { cache_dir: cache_dir.clone() }
-    } else if use_rocm || config.model.backend == "rocm" {
-        eprintln!("breadmill: ROCm backend selected");
-        Backend::Rocm
-    } else if use_cuda || config.model.backend == "cuda" {
-        eprintln!("breadmill: CUDA backend selected");
-        Backend::Cuda
+    // CLI flags always override config — otherwise an explicit --cuda/--npu on
+    // the command line would silently lose to an unrelated `backend = "..."`
+    // already sitting in config.toml, since that's whatever earlier branch a
+    // fixed if/else-if priority order happened to check first.
+    let backend_name = if use_npu {
+        "npu"
+    } else if use_rocm {
+        "rocm"
+    } else if use_cuda {
+        "cuda"
     } else {
-        Backend::Cpu
+        config.model.backend.as_str()
+    };
+
+    let backend = match backend_name {
+        "npu" => {
+            eprintln!("breadmill: NPU backend selected");
+            Backend::Npu { cache_dir: cache_dir.clone() }
+        }
+        "rocm" => {
+            eprintln!("breadmill: ROCm backend selected");
+            Backend::Rocm
+        }
+        "cuda" => {
+            eprintln!("breadmill: CUDA backend selected");
+            Backend::Cuda
+        }
+        _ => Backend::Cpu,
     };
 
     let store = Store::open(&state_dir, dim)?;
