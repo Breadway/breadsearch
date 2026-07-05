@@ -152,21 +152,31 @@ fn run_daemon(
     let store = Store::open(&state_dir, dim)?;
     let state = Arc::new(SharedState::new(store));
 
-    // Load embedder if model files present
+    // Load the embedder on a background thread — an OpenVINO/CUDA/etc EP
+    // compile can take minutes or hang outright, and doing this inline used
+    // to block the socket bind below until it finished. That turned "model
+    // still loading" into an indistinguishable "connection refused" for
+    // every client, including the GUI, for as long as the load took. The
+    // socket now opens immediately; serve.rs already answers "model not
+    // ready" (via `model_ready`) for any request that arrives before the
+    // background load finishes.
     let model_dir = model_dir(&cache_dir);
     let model_path = model_dir.join("model.onnx");
     let tokenizer_path = model_dir.join("tokenizer.json");
 
     if model_path.exists() && tokenizer_path.exists() {
-        eprintln!("breadmill: loading model...");
-        match OrtEmbedder::load(&model_path, &tokenizer_path, dim, backend) {
-            Ok(embedder) => {
-                *state.embedder.lock().unwrap() = Some(embedder);
-                state.model_ready.store(true, Ordering::Relaxed);
-                eprintln!("breadmill: model loaded");
+        let state_clone = Arc::clone(&state);
+        std::thread::spawn(move || {
+            eprintln!("breadmill: loading model...");
+            match OrtEmbedder::load(&model_path, &tokenizer_path, dim, backend) {
+                Ok(embedder) => {
+                    *state_clone.embedder.lock().unwrap() = Some(embedder);
+                    state_clone.model_ready.store(true, Ordering::Relaxed);
+                    eprintln!("breadmill: model loaded");
+                }
+                Err(e) => eprintln!("breadmill: model load failed: {} — run --fetch-model", e),
             }
-            Err(e) => eprintln!("breadmill: model load failed: {} — run --fetch-model", e),
-        }
+        });
     } else {
         eprintln!(
             "breadmill: model files not found in {} — run: breadmill --fetch-model",
