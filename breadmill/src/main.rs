@@ -13,10 +13,12 @@ mod indexer;
 mod power;
 mod serve;
 mod store;
+mod sync_ext;
 
 use embed::{Backend, OrtEmbedder};
 use indexer::{Indexer, SharedState};
 use store::Store;
+use sync_ext::MutexExt;
 
 const MODEL_URL: &str =
     "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/onnx/model.onnx";
@@ -170,7 +172,7 @@ fn run_daemon(
             eprintln!("breadmill: loading model...");
             match OrtEmbedder::load(&model_path, &tokenizer_path, dim, backend) {
                 Ok(embedder) => {
-                    *state_clone.embedder.lock().unwrap() = Some(embedder);
+                    *state_clone.embedder.lock_recover() = Some(embedder);
                     state_clone.model_ready.store(true, Ordering::Relaxed);
                     eprintln!("breadmill: model loaded");
                 }

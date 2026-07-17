@@ -298,12 +298,19 @@ fn run_ui() {
                     let _ = tx.send(breadsearch_shared::send_request(&req));
                 });
 
-                // Poll via idle_add_local until the thread delivers its result.
-                // Unix socket round-trips are sub-millisecond so this fires once.
+                // Wait for the thread's result on a bounded timer rather than
+                // an `idle_add_local` — an idle source has no wait condition
+                // of its own, so GLib re-invokes it on every single main-loop
+                // iteration, i.e. a busy-spin pinning a full CPU core for as
+                // long as the daemon takes to answer (normally sub-ms, but
+                // the daemon's socket has no read timeout of its own, so a
+                // wedged/slow daemon previously meant an indefinite spin).
+                // 15ms is imperceptible added latency for a search box and
+                // caps this at a couple dozen checks per second instead.
                 let rx = Rc::new(rx);
                 let list_t = list_clone.clone();
 
-                glib::idle_add_local(move || {
+                glib::timeout_add_local(std::time::Duration::from_millis(15), move || {
                     match rx.try_recv() {
                         Ok(result) => {
                             populate_list(&list_t, result);

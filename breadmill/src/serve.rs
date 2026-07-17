@@ -8,6 +8,7 @@ use std::{
 use breadsearch_shared::{Request, Response, StatusInfo};
 
 use crate::indexer::SharedState;
+use crate::sync_ext::MutexExt;
 
 pub fn run(socket_path: &Path, state: Arc<SharedState>, snippet_len: usize, search_limit: usize) {
     let _ = std::fs::remove_file(socket_path);
@@ -86,7 +87,7 @@ fn dispatch(
             }
 
             let embedding = {
-                let mut embedder = state.embedder.lock().unwrap();
+                let mut embedder = state.embedder.lock_recover();
                 match embedder.as_mut() {
                     Some(e) => match e.embed_query(&query) {
                         Ok(v) => v,
@@ -101,7 +102,7 @@ fn dispatch(
             };
 
             let limit = limit.min(search_limit).max(1);
-            let store = state.store.lock().unwrap();
+            let store = state.store.lock_recover();
 
             match store.search(&embedding, limit, snippet_len) {
                 Ok(hits) => Response::Hits { hits },

@@ -10,7 +10,7 @@ use ignore::WalkBuilder;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher, EventKind};
 use sha2::{Digest, Sha256};
 
-use crate::{embed::OrtEmbedder, extract, chunk, power, store::Store};
+use crate::{embed::OrtEmbedder, extract, chunk, power, store::Store, sync_ext::MutexExt};
 
 pub struct SharedState {
     pub store: Mutex<Store>,
@@ -64,7 +64,7 @@ impl Indexer {
     pub fn full_reindex(&self) {
         eprintln!("breadmill: full reindex triggered");
         {
-            let mut store = self.state.store.lock().unwrap();
+            let mut store = self.state.store.lock_recover();
             // Clear all state
             let _ = store.conn.execute_batch("DELETE FROM chunks; DELETE FROM files;");
             let _ = store.index.reserve(4096);
@@ -87,7 +87,7 @@ impl Indexer {
 
         // Snapshot existing indexed files
         let known: HashMap<String, (i64, String)> = {
-            let store = self.state.store.lock().unwrap();
+            let store = self.state.store.lock_recover();
             store.all_files()
                 .unwrap_or_default()
                 .into_iter()
@@ -155,7 +155,7 @@ impl Indexer {
             .collect();
 
         if !to_delete.is_empty() {
-            let mut store = self.state.store.lock().unwrap();
+            let mut store = self.state.store.lock_recover();
             for path in to_delete {
                 eprintln!("breadmill: removing deleted file: {}", path);
                 let _ = store.delete_file(&path);
@@ -163,7 +163,7 @@ impl Indexer {
         }
 
         let count = {
-            let store = self.state.store.lock().unwrap();
+            let store = self.state.store.lock_recover();
             let n = store.chunk_count();
             let _ = store.save_index(&self.state_dir);
             n
@@ -238,7 +238,7 @@ impl Indexer {
                     self.handle_fs_event(&path);
                 }
                 let count = {
-                    let store = self.state.store.lock().unwrap();
+                    let store = self.state.store.lock_recover();
                     let n = store.chunk_count();
                     let _ = store.save_index(&self.state_dir);
                     n
@@ -261,7 +261,7 @@ impl Indexer {
         if !path.is_file() {
             let path_str = path.to_string_lossy().into_owned();
             // File deleted — remove from index
-            let mut store = self.state.store.lock().unwrap();
+            let mut store = self.state.store.lock_recover();
             let _ = store.delete_file(&path_str);
             return;
         }
@@ -309,7 +309,7 @@ impl Indexer {
 
         // Check if hash changed (catches content changes without mtime change)
         {
-            let store = self.state.store.lock().unwrap();
+            let store = self.state.store.lock_recover();
             if let Ok(files) = store.all_files() {
                 if files.iter().any(|f| f.path == path_str && f.hash == hash) {
                     return;
@@ -322,20 +322,22 @@ impl Indexer {
         // for natural-language files.
         let chunks = chunk::chunk_text(&text, 400, 80, 2_000);
         eprintln!("breadmill: embedding {} ({} chars, {} chunks)", path_str, text.len(), chunks.len());
-        let mut embedder_guard = self.state.embedder.lock().unwrap();
 
         if !self.state.model_ready.load(Ordering::Relaxed) {
             eprintln!("breadmill: model not ready, skipping embed for {}", path_str);
             return;
         }
 
-        let embedder = match embedder_guard.as_mut() {
-            Some(e) => e,
-            None => return,
-        };
+        // Confirm the embedder is actually present before committing to
+        // clearing this file's old chunks below — same check as before,
+        // just without holding the embedder lock past this one glance (see
+        // the per-chunk locking in the loop for why).
+        if self.state.embedder.lock_recover().is_none() {
+            return;
+        }
 
         {
-            let mut store = self.state.store.lock().unwrap();
+            let mut store = self.state.store.lock_recover();
             let _ = store.delete_file(path_str); // remove old chunks/vectors first
         }
 
@@ -344,9 +346,18 @@ impl Indexer {
 
         for (i, chunk) in chunks.iter().enumerate() {
             eprintln!("breadmill: embed chunk {}/{} ({} chars) for {}", i + 1, chunks.len(), chunk.text.len(), path_str);
-            match embedder.embed_document(&chunk.text) {
+            // Lock the embedder only around this single chunk's embed call —
+            // this used to be held for the whole file's chunk loop, so one
+            // large file needing a fresh MIGraphX JIT compile (60-120s for a
+            // new sequence length) could block every query (serve.rs locks
+            // this same mutex) for the entire file, not just one chunk.
+            let embed_result = match self.state.embedder.lock_recover().as_mut() {
+                Some(embedder) => embedder.embed_document(&chunk.text),
+                None => break, // model was unloaded mid-scan; stop here
+            };
+            match embed_result {
                 Ok(embedding) => {
-                    let mut store = self.state.store.lock().unwrap();
+                    let mut store = self.state.store.lock_recover();
                     // Ensure file row exists before inserting chunks (FK constraint)
                     let _ = store.upsert_file(path_str, mtime, &hash);
                     let _ = store.insert_chunk(
@@ -367,7 +378,7 @@ impl Indexer {
             eprintln!("breadmill: no chunks embedded for {}", path_str);
             // Record the file so the mtime+hash check skips it on the next startup
             // rather than re-entering the same embed-fail loop.
-            let store = self.state.store.lock().unwrap();
+            let store = self.state.store.lock_recover();
             let _ = store.upsert_file(path_str, mtime, &hash);
         } else {
             // Increment live so `status` reflects progress before the full scan ends.
