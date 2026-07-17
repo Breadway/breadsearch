@@ -42,6 +42,8 @@ breadsearch-shared = { path = "../breadsearch-shared" }
 #   needed for the plain CPU path even in the npu build.
 ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-23"] }
 tokenizers = "0"
+# TODO(owner): switch to tag-pinned git dependency once bread-onnx is merged and tagged, matching the bread-theme pattern
+bread-onnx = { path = "../../bread-ecosystem-fix-worktree/bread-onnx" }
 
 # Surfaces ort's own EP-registration tracing (e.g. a GPU EP silently failing to
 # register and falling back to CPU) as visible log output instead of nowhere.

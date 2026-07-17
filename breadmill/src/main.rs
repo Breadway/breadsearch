@@ -1,5 +1,4 @@
 use std::{
-    io::Read,
     path::{Path, PathBuf},
     sync::{Arc, atomic::Ordering},
 };
@@ -226,29 +225,10 @@ fn download_if_missing(url: &str, dest: &Path) -> Result<(), String> {
         eprintln!("  already present: {}", dest.display());
         return Ok(());
     }
-
-    eprintln!("  downloading {} ...", url);
-    let agent = ureq::AgentBuilder::new()
-        .timeout(std::time::Duration::from_secs(300))
-        .build();
-
-    let response = agent.get(url).call().map_err(|e| e.to_string())?;
-    let mut bytes = Vec::new();
-    response
-        .into_reader()
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-
-    if bytes.is_empty() {
-        return Err(format!("empty download from {}", url));
-    }
-
-    // Write atomically via temp file
-    let tmp = dest.with_extension("tmp");
-    std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, dest).map_err(|e| e.to_string())?;
-
-    eprintln!("  saved {} ({:.1} MB)", dest.display(), bytes.len() as f64 / 1_048_576.0);
+    // Shared with breadarrd's own (previously reqwest/async, now also this
+    // same sync/ureq implementation) model downloader — see
+    // bread_onnx::download's doc comment.
+    bread_onnx::download::ensure_file(url, dest, None).map_err(|e| e.to_string())?;
     Ok(())
 }
 
