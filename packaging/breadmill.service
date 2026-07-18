@@ -1,6 +1,6 @@
 [Unit]
 Description=Breadmill semantic search indexer
-Documentation=https://github.com/breadway/breadsearch
+Documentation=https://git.breadway.dev/Breadway/breadsearch
 After=default.target
 
 [Service]
