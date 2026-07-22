@@ -29,3 +29,6 @@ logs/
 # Runtime files
 *.sock
 *.pid
+
+# Local hygiene notes (not for commit)
+CLAUDE.md
