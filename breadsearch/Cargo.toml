@@ -11,6 +11,10 @@ path = "src/main.rs"
 [dependencies]
 breadsearch-shared = { path = "../breadsearch-shared" }
 bread-theme = { git = "https://github.com/Breadway/bread-ecosystem", tag = "v0.2.10", features = ["gtk"] }
+# Capture primitives for `--screenshot` mode — see src/screenshot.rs.
+bread-screenshots = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", branch = "dev" }
 gtk4 = { version = "0.11", features = ["v4_12"] }
 gtk4-layer-shell = "0.8"
 serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
