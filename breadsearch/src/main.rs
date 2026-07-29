@@ -18,6 +18,8 @@ use gtk4::{
 };
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
+mod screenshot;
+
 // ---- Theming ----------------------------------------------------------------
 
 fn build_css(p: &Palette) -> String {
@@ -208,10 +210,17 @@ fn open_folder(path: &str) {
 
 // ---- UI ---------------------------------------------------------------------
 
-fn run_ui() {
-    let app = Application::builder()
-        .application_id("com.breadway.breadsearch")
-        .build();
+fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
+    let mut builder = Application::builder().application_id("com.breadway.breadsearch");
+    if screenshot_req.is_some() {
+        // GApplication is single-instance by default; this machine typically
+        // already has a real breadsearch instance, so without this a
+        // screenshot run would just message the *existing* instance instead
+        // of starting a fresh one that ever sees `screenshot_req`.
+        builder = builder.flags(gtk4::gio::ApplicationFlags::NON_UNIQUE);
+    }
+    let app = builder.build();
+    let is_screenshot_run = screenshot_req.is_some();
 
     let debounce_id: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
 
@@ -419,18 +428,37 @@ fn run_ui() {
         window.add_controller(outside_click);
 
         window.connect_destroy(|_| cleanup_pid());
+
+        if let Some(req) = screenshot_req.clone() {
+            screenshot::dispatch(&window, req);
+        }
+
         window.present();
         search.grab_focus();
     });
 
-    app.run();
+    if is_screenshot_run {
+        // GLib's own option parser otherwise rejects --screenshot/--output
+        // before clap ever sees them (`Cli::parse()` already ran in `main`,
+        // over the real argv).
+        app.run_with_args(&[] as &[&str]);
+    } else {
+        app.run();
+    }
 }
 
 // ---- Main -------------------------------------------------------------------
 
 fn main() {
-    if !toggle_or_continue() {
+    use clap::Parser;
+    let cli = screenshot::Cli::parse();
+    let screenshot_req = cli.screenshot_request();
+
+    // The PID-file toggle kills whatever's holding the file — a real,
+    // already-running breadsearch instance included. A screenshot run must
+    // never touch it: it's a separate, disposable instance by design.
+    if screenshot_req.is_none() && !toggle_or_continue() {
         return;
     }
-    run_ui();
+    run_ui(screenshot_req);
 }
