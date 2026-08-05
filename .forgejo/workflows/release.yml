@@ -22,10 +22,10 @@ jobs:
         # `backend` in config.toml. All three are ort load-dynamic (dlopen)
         # EPs, so this doesn't require the NPU/ROCm/CUDA toolkits to be
         # present on the build host — see breadmill/Cargo.toml.
-        run: cd src && cargo build --release --locked --workspace --features full
+        run: cd src && bash ci/build.sh cargo build --release --locked --workspace --features full
 
       - name: test
-        run: cd src && cargo test --release --locked --workspace --features full
+        run: cd src && bash ci/build.sh cargo test --release --locked --workspace --features full
 
       - name: prepare artifacts
         run: |

@@ -19,10 +19,10 @@ jobs:
             "https://git.breadway.dev/${GITHUB_REPOSITORY}.git" src
 
       - name: build
-        run: cd src && cargo build --release --locked --workspace --features full
+        run: cd src && bash ci/build.sh cargo build --release --locked --workspace --features full
 
       - name: test
-        run: cd src && cargo test --release --locked --workspace --features full
+        run: cd src && bash ci/build.sh cargo test --release --locked --workspace --features full
 
       - name: compute dev version
         run: |
