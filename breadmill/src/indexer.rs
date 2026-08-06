@@ -64,7 +64,7 @@ impl Indexer {
     pub fn full_reindex(&self) {
         eprintln!("breadmill: full reindex triggered");
         {
-            let mut store = self.state.store.lock_recover();
+            let store = self.state.store.lock_recover();
             // Clear all state
             let _ = store.conn.execute_batch("DELETE FROM chunks; DELETE FROM files;");
             let _ = store.index.reserve(4096);
@@ -416,9 +416,9 @@ fn sha256_str(bytes: &[u8]) -> String {
 }
 
 pub fn expand_home(path: &str) -> PathBuf {
-    if path.starts_with("~/") {
+    if let Some(rest) = path.strip_prefix("~/") {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-        PathBuf::from(home).join(&path[2..])
+        PathBuf::from(home).join(rest)
     } else {
         PathBuf::from(path)
     }

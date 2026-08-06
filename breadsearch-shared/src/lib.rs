@@ -43,7 +43,7 @@ pub fn socket_path() -> PathBuf {
 
 // ---- Config -----------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub index: IndexConfig,
@@ -157,16 +157,6 @@ impl Default for ModelConfig {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            index: IndexConfig::default(),
-            search: SearchConfig::default(),
-            model: ModelConfig::default(),
-            power: PowerConfig::default(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PowerConfig {
@@ -255,8 +245,7 @@ pub struct StatusInfo {
 pub fn send_request(req: &Request) -> std::io::Result<Response> {
     let mut stream = UnixStream::connect(socket_path())?;
 
-    let mut line = serde_json::to_string(req)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let mut line = serde_json::to_string(req).map_err(std::io::Error::other)?;
     line.push('\n');
     stream.write_all(line.as_bytes())?;
     stream.flush()?;

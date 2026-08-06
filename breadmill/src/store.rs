@@ -6,7 +6,6 @@ use usearch::{Index, IndexOptions, MetricKind, ScalarKind, new_index};
 pub struct Store {
     pub conn: Connection,
     pub index: Index,
-    pub dim: usize,
 }
 
 // usearch::Index wraps a raw C++ pointer; access is serialized by the Mutex<Store>.
@@ -87,7 +86,7 @@ impl Store {
             index.reserve(4096).map_err(|e| e.to_string())?;
         }
 
-        Ok(Self { conn, index, dim })
+        Ok(Self { conn, index })
     }
 
     // ---- file state ---------------------------------------------------------

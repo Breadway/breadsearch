@@ -81,10 +81,9 @@ fn split_by_chars(chunk: Chunk, max_chars: usize) -> Vec<Chunk> {
     let text = &chunk.text;
     let mut result = Vec::new();
     let mut seg_start = 0usize;
-    let mut count = 0usize;
 
-    for (byte_idx, _) in text.char_indices() {
-        if count > 0 && count % max_chars == 0 {
+    for (count, (byte_idx, _)) in text.char_indices().enumerate() {
+        if count > 0 && count.is_multiple_of(max_chars) {
             result.push(Chunk {
                 text: text[seg_start..byte_idx].to_string(),
                 start: chunk.start + seg_start,
@@ -92,7 +91,6 @@ fn split_by_chars(chunk: Chunk, max_chars: usize) -> Vec<Chunk> {
             });
             seg_start = byte_idx;
         }
-        count += 1;
     }
     if seg_start < text.len() {
         result.push(Chunk {
