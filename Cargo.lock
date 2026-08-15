@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "breadmill"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bread-onnx",
  "breadsearch-shared",
@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "breadsearch"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "bread-screenshots",
@@ -277,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "breadsearch-shared"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "serde",
  "serde_json",
