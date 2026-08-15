@@ -205,6 +205,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bread-shared"
+version = "0.7.0"
+source = "git+https://git.breadway.dev/Breadway/bread?tag=v0.7.0#22e34e2cf2202305d7960759dfccb54dc79f948b"
+dependencies = [
+ "dirs",
+ "serde",
+ "serde_json",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "bread-theme"
 version = "0.3.1"
 source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.7.1#db2fa3c4b4c1e6933bc5cf62a236d05972fdc886"
@@ -220,6 +231,7 @@ name = "bread-utils"
 version = "0.3.1"
 source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.7.1#db2fa3c4b4c1e6933bc5cf62a236d05972fdc886"
 dependencies = [
+ "bread-shared",
  "dirs",
  "serde",
  "serde_json",
@@ -265,6 +277,7 @@ dependencies = [
  "anyhow",
  "bread-screenshots",
  "bread-theme",
+ "bread-utils 0.3.1 (git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.7.1)",
  "breadsearch-shared",
  "clap",
  "gtk4",

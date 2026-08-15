@@ -11,6 +11,8 @@ path = "src/main.rs"
 [dependencies]
 breadsearch-shared = { path = "../breadsearch-shared" }
 bread-theme = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.1", features = ["gtk"] }
+# Bread event fabric client — emit bread.search.* (fail-silent if breadd is down).
+bread-utils = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.1", features = ["bread-client"] }
 # Capture primitives for `--screenshot` mode — see src/screenshot.rs.
 # Not on tag v0.7.1 (crate landed after that tag). Rev, not branch=main.
 # v0.7.1 predates this crate; same rev siblings use.

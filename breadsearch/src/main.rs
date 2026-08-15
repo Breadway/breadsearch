@@ -18,6 +18,7 @@ use gtk4::{
 };
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
+mod bread_events;
 mod screenshot;
 
 // ---- Theming ----------------------------------------------------------------
@@ -193,6 +194,7 @@ fn open_file(path: &str) {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn();
+    bread_events::emit_opened_result(path);
 }
 
 fn open_folder(path: &str) {
@@ -206,6 +208,7 @@ fn open_folder(path: &str) {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn();
+    bread_events::emit_opened_result(path);
 }
 
 // ---- UI ---------------------------------------------------------------------
@@ -433,6 +436,7 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
             screenshot::dispatch(&window, req);
         }
 
+        window.connect_map(|_| bread_events::emit_opened());
         window.present();
         search.grab_focus();
     });
