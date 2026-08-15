@@ -19,6 +19,7 @@ use gtk4::{
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
 mod bread_events;
+mod listen;
 mod screenshot;
 
 // ---- Theming ----------------------------------------------------------------
@@ -454,6 +455,11 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
 // ---- Main -------------------------------------------------------------------
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("listen") {
+        listen::run();
+        return;
+    }
+
     use clap::Parser;
     let cli = screenshot::Cli::parse();
     let screenshot_req = cli.screenshot_request();
