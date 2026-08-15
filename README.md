@@ -2,6 +2,8 @@
 
 Semantic document search for Bread OS. Type a concept — not a keyword — and get ranked hits from your documents.
 
+This is **not** [breadbox](https://git.breadway.dev/Breadway/breadbox). breadsearch is document/meaning search over your files; breadbox is the app launcher (fuzzy `.desktop` launch). They are separate overlays with separate binaries, sockets, and keybinds — even though the search panel was originally forked from breadbox's launcher UI.
+
 Two binaries in one Cargo workspace:
 
 - **breadmill** — background daemon. Walks configured directories, extracts text, chunks and embeds documents with [nomic-embed-text-v1.5](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5) (768-dim ONNX), stores vectors in an HNSW index (usearch) backed by SQLite metadata, and serves queries over a Unix socket. Watches for filesystem changes and re-indexes incrementally.

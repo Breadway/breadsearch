@@ -181,11 +181,11 @@ dependencies = [
 
 [[package]]
 name = "bread-onnx"
-version = "0.3.0"
-source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.3.0#8e82d2d833e992ce939a5b836f910ee109f2e939"
+version = "0.3.1"
+source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.7.1#db2fa3c4b4c1e6933bc5cf62a236d05972fdc886"
 dependencies = [
  "anyhow",
- "bread-utils 0.3.0",
+ "bread-utils 0.3.1 (git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.7.1)",
  "hex",
  "ort",
  "sha2 0.10.9",
@@ -197,17 +197,17 @@ dependencies = [
 [[package]]
 name = "bread-screenshots"
 version = "0.3.1"
-source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?branch=main#f86e299f4a0ea73ff485cd84923b986ddcc8242e"
+source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=f86e299f4a0ea73ff485cd84923b986ddcc8242e#f86e299f4a0ea73ff485cd84923b986ddcc8242e"
 dependencies = [
  "anyhow",
- "bread-utils 0.3.1",
+ "bread-utils 0.3.1 (git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=f86e299f4a0ea73ff485cd84923b986ddcc8242e)",
  "tracing",
 ]
 
 [[package]]
 name = "bread-theme"
-version = "0.2.3"
-source = "git+https://github.com/Breadway/bread-ecosystem?tag=v0.2.10#17d1bb85801b9a8c195b64c02d288cd662c9c780"
+version = "0.3.1"
+source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.7.1#db2fa3c4b4c1e6933bc5cf62a236d05972fdc886"
 dependencies = [
  "dirs",
  "gtk4",
@@ -217,8 +217,8 @@ dependencies = [
 
 [[package]]
 name = "bread-utils"
-version = "0.3.0"
-source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.3.0#8e82d2d833e992ce939a5b836f910ee109f2e939"
+version = "0.3.1"
+source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.7.1#db2fa3c4b4c1e6933bc5cf62a236d05972fdc886"
 dependencies = [
  "dirs",
  "serde",
@@ -228,7 +228,7 @@ dependencies = [
 [[package]]
 name = "bread-utils"
 version = "0.3.1"
-source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?branch=main#f86e299f4a0ea73ff485cd84923b986ddcc8242e"
+source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=f86e299f4a0ea73ff485cd84923b986ddcc8242e#f86e299f4a0ea73ff485cd84923b986ddcc8242e"
 dependencies = [
  "dirs",
  "serde",
