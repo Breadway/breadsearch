@@ -197,10 +197,10 @@ dependencies = [
 [[package]]
 name = "bread-screenshots"
 version = "0.3.1"
-source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=f86e299f4a0ea73ff485cd84923b986ddcc8242e#f86e299f4a0ea73ff485cd84923b986ddcc8242e"
+source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=69ce2d67a8de8a09c064aa9d7ff99b46656f0b1d#69ce2d67a8de8a09c064aa9d7ff99b46656f0b1d"
 dependencies = [
  "anyhow",
- "bread-utils 0.3.1 (git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=f86e299f4a0ea73ff485cd84923b986ddcc8242e)",
+ "bread-utils 0.3.1 (git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=69ce2d67a8de8a09c064aa9d7ff99b46656f0b1d)",
  "tracing",
 ]
 
@@ -228,7 +228,7 @@ dependencies = [
 [[package]]
 name = "bread-utils"
 version = "0.3.1"
-source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=f86e299f4a0ea73ff485cd84923b986ddcc8242e#f86e299f4a0ea73ff485cd84923b986ddcc8242e"
+source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?rev=69ce2d67a8de8a09c064aa9d7ff99b46656f0b1d#69ce2d67a8de8a09c064aa9d7ff99b46656f0b1d"
 dependencies = [
  "dirs",
  "serde",
