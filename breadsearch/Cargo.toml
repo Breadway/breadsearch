@@ -10,13 +10,11 @@ path = "src/main.rs"
 
 [dependencies]
 breadsearch-shared = { path = "../breadsearch-shared" }
-bread-theme = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.1", features = ["gtk"] }
+bread-theme = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.2", features = ["gtk"] }
 # Bread event fabric client — emit bread.search.* (fail-silent if breadd is down).
-bread-utils = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.1", features = ["bread-client"] }
+bread-utils = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.2", features = ["bread-client"] }
 # Capture primitives for `--screenshot` mode — see src/screenshot.rs.
-# Not on tag v0.7.1 (crate landed after that tag). Rev, not branch=main.
-# v0.7.1 predates this crate; same rev siblings use.
-bread-screenshots = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", rev = "69ce2d67a8de8a09c064aa9d7ff99b46656f0b1d" }
+bread-screenshots = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.2" }
 gtk4 = { version = "0.11", features = ["v4_12"] }
 gtk4-layer-shell = "0.8"
 serde_json = "1"
