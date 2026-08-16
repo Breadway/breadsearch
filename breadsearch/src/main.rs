@@ -247,6 +247,7 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
             window.set_anchor(edge, true);
         }
         window.set_exclusive_zone(0);
+        bread_theme::gtk::bind_window_auto(&window);
 
         let close_all: Rc<dyn Fn()> = Rc::new({
             let w = window.clone();
