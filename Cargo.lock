@@ -230,6 +230,8 @@ source = "git+https://git.breadway.dev/Breadway/bread-ecosystem?tag=v0.7.2#30517
 dependencies = [
  "bread-shared",
  "dirs",
+ "gtk4",
+ "gtk4-layer-shell",
  "serde",
  "serde_json",
 ]

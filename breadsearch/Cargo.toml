@@ -12,7 +12,7 @@ path = "src/main.rs"
 breadsearch-shared = { path = "../breadsearch-shared" }
 bread-theme = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.4", features = ["gtk"] }
 # Bread event fabric client — emit bread.search.* (fail-silent if breadd is down).
-bread-utils = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.2", features = ["bread-client"] }
+bread-utils = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.2", features = ["bread-client", "gtk"] }
 # Capture primitives for `--screenshot` mode — see src/screenshot.rs.
 bread-screenshots = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.2" }
 gtk4 = { version = "0.11", features = ["v4_12"] }

@@ -1,22 +1,12 @@
 use bread_theme::{hex_to_rgba, ink_on, load_palette, Palette};
 use breadsearch_shared::{Hit, Request, Response};
-use std::{
-    cell::RefCell,
-    env, fs,
-    path::PathBuf,
-    process::Command,
-    rc::Rc,
-    sync::mpsc,
-};
+use std::{cell::RefCell, process::Command, rc::Rc, sync::mpsc};
 
 use gtk4::{
-    glib,
-    pango::EllipsizeMode,
-    prelude::*,
-    Application, ApplicationWindow, Box as GBox, CssProvider, EventControllerKey, Image, Label,
-    ListBox, Orientation, PolicyType, ScrolledWindow, SearchEntry, SelectionMode,
+    glib, pango::EllipsizeMode, prelude::*, Application, Box as GBox, CssProvider,
+    EventControllerKey, Image, Label, ListBox, Orientation, PolicyType, ScrolledWindow,
+    SearchEntry, SelectionMode,
 };
-use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
 mod bread_events;
 mod listen;
@@ -43,45 +33,12 @@ fn build_css(p: &Palette) -> String {
          .hit-snippet {{ opacity: 0.75; font-size: 11px; font-style: italic; }}\
          .hit-score {{ opacity: 0.5; font-size: 11px; }}\
          image {{ margin-right: 8px; }}",
-        bg_panel   = bg_panel,
-        surface    = p.color0,
-        accent     = p.color4,
-        on_bg      = ink_on(&p.background),
+        bg_panel = bg_panel,
+        surface = p.color0,
+        accent = p.color4,
+        on_bg = ink_on(&p.background),
         on_surface = ink_on(&p.color0),
     )
-}
-
-// ---- PID file toggle --------------------------------------------------------
-
-fn pid_file() -> PathBuf {
-    env::var("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"))
-        .join("breadsearch.pid")
-}
-
-fn is_breadsearch_pid(pid: u32) -> bool {
-    fs::read_to_string(format!("/proc/{}/comm", pid))
-        .map(|s| s.trim() == "breadsearch")
-        .unwrap_or(false)
-}
-
-fn toggle_or_continue() -> bool {
-    let pf = pid_file();
-    if let Ok(content) = fs::read_to_string(&pf) {
-        if let Ok(pid) = content.trim().parse::<u32>() {
-            if is_breadsearch_pid(pid) {
-                let _ = Command::new("kill").arg(pid.to_string()).status();
-                return false;
-            }
-        }
-    }
-    let _ = fs::write(&pf, std::process::id().to_string());
-    true
-}
-
-fn cleanup_pid() {
-    let _ = fs::remove_file(pid_file());
 }
 
 // ---- Row builder ------------------------------------------------------------
@@ -238,21 +195,13 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
             bread_theme::gtk::apply_user_css(&user_css_path, &user_cell);
         }
 
-        let window = ApplicationWindow::builder().application(app).build();
-        window.init_layer_shell();
-        window.set_namespace(Some("breadsearch"));
-        window.set_layer(Layer::Overlay);
-        window.set_keyboard_mode(KeyboardMode::Exclusive);
-        for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
-            window.set_anchor(edge, true);
-        }
-        window.set_exclusive_zone(0);
+        // Full-screen transparent overlay; panel widget is positioned inside it.
+        let window = bread_utils::gtk_popup::new_overlay_window(app, "breadsearch");
         bread_theme::gtk::bind_window_auto(&window);
 
         let close_all: Rc<dyn Fn()> = Rc::new({
             let w = window.clone();
             move || {
-                cleanup_pid();
                 w.close();
             }
         });
@@ -308,7 +257,10 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
                 let (tx, rx) = mpsc::sync_channel::<std::io::Result<Response>>(1);
 
                 std::thread::spawn(move || {
-                    let req = Request::Query { query: q, limit: 10 };
+                    let req = Request::Query {
+                        query: q,
+                        limit: 10,
+                    };
                     let _ = tx.send(breadsearch_shared::send_request(&req));
                 });
 
@@ -368,36 +320,11 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
                     glib::Propagation::Stop
                 }
                 Key::Down => {
-                    let cur = list_k.selected_row().map(|r| r.index()).unwrap_or(-1);
-                    let mut i = cur + 1;
-                    loop {
-                        match list_k.row_at_index(i) {
-                            Some(r) if r.is_selectable() => {
-                                list_k.select_row(Some(&r));
-                                break;
-                            }
-                            Some(_) => i += 1,
-                            None => break,
-                        }
-                    }
+                    bread_utils::gtk_popup::select_next_visible(&list_k);
                     glib::Propagation::Stop
                 }
                 Key::Up => {
-                    let cur = list_k.selected_row().map(|r| r.index()).unwrap_or(0);
-                    let mut i = cur - 1;
-                    loop {
-                        if i < 0 {
-                            break;
-                        }
-                        match list_k.row_at_index(i) {
-                            Some(r) if r.is_selectable() => {
-                                list_k.select_row(Some(&r));
-                                break;
-                            }
-                            Some(_) => i -= 1,
-                            None => break,
-                        }
-                    }
+                    bread_utils::gtk_popup::select_prev_visible(&list_k);
                     glib::Propagation::Stop
                 }
                 _ => glib::Propagation::Proceed,
@@ -415,24 +342,10 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
         });
 
         // Click outside launcher panel → close
-        let close_outside = Rc::clone(&close_all);
-        let vbox_ref = vbox.clone();
-        let win_ref = window.clone();
-        let outside_click = gtk4::GestureClick::new();
-        outside_click.connect_pressed(move |_, _, x, y| {
-            if let Some(b) = vbox_ref.compute_bounds(&win_ref) {
-                if x < b.x() as f64
-                    || x > (b.x() + b.width()) as f64
-                    || y < b.y() as f64
-                    || y > (b.y() + b.height()) as f64
-                {
-                    close_outside();
-                }
-            }
-        });
-        window.add_controller(outside_click);
-
-        window.connect_destroy(|_| cleanup_pid());
+        {
+            let close_outside = Rc::clone(&close_all);
+            bread_utils::gtk_popup::close_on_outside_click(&window, &vbox, move || close_outside());
+        }
 
         if let Some(req) = screenshot_req.clone() {
             screenshot::dispatch(&window, req);
@@ -465,11 +378,29 @@ fn main() {
     let cli = screenshot::Cli::parse();
     let screenshot_req = cli.screenshot_request();
 
-    // The PID-file toggle kills whatever's holding the file — a real,
-    // already-running breadsearch instance included. A screenshot run must
-    // never touch it: it's a separate, disposable instance by design.
-    if screenshot_req.is_none() && !toggle_or_continue() {
-        return;
-    }
+    // `toggle_or_kill` kills whatever's holding the single-instance lock —
+    // a real, already-running breadsearch included. A screenshot run must
+    // never touch it: it's a separate, disposable instance by design (same
+    // reasoning as breadbar's `allow_multiple_instances`), not a toggle of
+    // the operator's real search panel.
+    //
+    // Kept alive for the rest of `main` — dropping it releases the
+    // single-instance lock and removes the pid file, which happens
+    // naturally once `run_ui` returns (after the window closes).
+    let _singleton_guard = if screenshot_req.is_some() {
+        None
+    } else {
+        match bread_utils::singleton::toggle_or_kill("breadsearch") {
+            Ok(bread_utils::singleton::Toggle::Started(guard)) => Some(guard),
+            Ok(bread_utils::singleton::Toggle::KilledExisting) => return,
+            Err(e) => {
+                eprintln!(
+                    "breadsearch: single-instance lock unavailable ({e}); continuing without it"
+                );
+                None
+            }
+        }
+    };
+
     run_ui(screenshot_req);
 }
