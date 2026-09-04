@@ -20,7 +20,7 @@ When starting work on a new feature, create branch `feature/<feature-name>`.
 When working on a bug or issue, create branch `fix/<issue you are fixing>`.
 
 ## Remotes
-- `origin` — Forgejo (`git.breadway.dev` via Hestia, SSH) — authoritative.
+- `origin` — Forgejo (`git.breadway.dev`, SSH) — authoritative.
 - `github` — GitHub mirror. Push both when publishing.
 
 ## CI
