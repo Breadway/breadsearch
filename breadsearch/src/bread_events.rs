@@ -1,4 +1,4 @@
-//! `bread.search.*` event integration — optional, non-blocking. See
+//! `bread.search.*` event integration, optional, non-blocking. See
 //! `EVENTS.md` at the repo root for the full contract. breadsearch works
 //! identically with or without breadd running; every call here is
 //! fire-and-forget (`BreadClient::emit` never blocks or errors this
@@ -7,7 +7,7 @@
 use bread_utils::bread_client::BreadClient;
 
 /// This app's id in bread's sibling-app namespace registry
-/// (`bread_shared::apps::KNOWN_APPS`) — events publish as `bread.search.*`.
+/// (`bread_shared::apps::KNOWN_APPS`); events publish as `bread.search.*`.
 pub const APP_ID: &str = "search";
 
 fn client() -> BreadClient {

@@ -27,7 +27,7 @@ pub enum Backend {
     /// Intel iGPU/dGPU (Arc) via the OpenVINO ONNX Runtime execution
     /// provider, requesting device_type "GPU". `cache_dir` stores OpenVINO's
     /// compiled-model blobs between runs (its own `with_cache_dir`, not an
-    /// env var — unlike MIGraphX this doesn't need a workaround).
+    /// env var; unlike MIGraphX this doesn't need a workaround).
     OpenVino { cache_dir: PathBuf },
 }
 
@@ -63,8 +63,8 @@ impl OrtEmbedder {
 // shared session-builder + EP-fallback + loud-logging code every EP branch
 // below used to hand-roll separately (`configure_eps`/`npu_session`/
 // `rocm_session`/`cuda_session`/`openvino_session`). What's genuinely
-// specific to this crate — its cargo feature gates (npu/rocm/cuda/openvino),
-// and NPU's `vaip_config.json` discovery — stays here.
+// specific to this crate: its cargo feature gates (npu/rocm/cuda/openvino),
+// and NPU's `vaip_config.json` discovery, stays here.
 
 fn to_provider(backend: Backend) -> Result<Provider, String> {
     match backend {
@@ -81,7 +81,7 @@ fn npu_provider(cache_dir: PathBuf) -> Result<Provider, String> {
     let vaip_config = find_vaip_config()?;
     if std::env::var("ORT_DYLIB_PATH").is_err() {
         eprintln!(
-            "breadmill: hint — set ORT_DYLIB_PATH to the Ryzen AI SDK ORT, e.g.:\n  \
+            "breadmill: hint: set ORT_DYLIB_PATH to the Ryzen AI SDK ORT, e.g.:\n  \
              ORT_DYLIB_PATH=~/.local/share/ryzen-ai-1.7.1/lib/libonnxruntime.so"
         );
     }

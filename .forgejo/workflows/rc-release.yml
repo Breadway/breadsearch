@@ -1,7 +1,7 @@
 name: beta (rc) release
 
 # Publishes a beta-track build for any `vX.Y.Z-rc.N` prerelease tag
-# pushed to `main` — there is no separate `beta` branch; "freezing" is
+# pushed to `main`, there is no separate `beta` branch; "freezing" is
 # just pausing pushes to main while an RC gets tested. See
 # bread-ecosystem's docs/release-channels.md for the release-track policy.
 on:
@@ -43,7 +43,7 @@ jobs:
           cp src/bakery.toml "${PKG_DIR}/bakery.toml"
           ln -sfn "${VERSION}" "/srv/breadway-dl/beta/breadsearch/latest"
 
-      # No GitHub Release upload — beta, like dev, is only distributed via
+      # No GitHub Release upload: beta, like dev, is only distributed via
       # dl.breadway.dev/beta/.
       - name: regenerate beta index.json
         env:
@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${MINISIGN_SEC_KEY:-}" ]; then
-            echo "::error::BAKERY_MINISIGN_SEC_KEY_PATH secret not set — refusing to regenerate beta index.json unsigned (would leave a stale signature mismatched against fresh content and break bakery for everyone on the beta track)"
+            echo "::error::BAKERY_MINISIGN_SEC_KEY_PATH secret not set, refusing to regenerate beta index.json unsigned (would leave a stale signature mismatched against fresh content and break bakery for everyone on the beta track)"
             exit 1
           fi
           rm -rf /tmp/bread-ecosystem-ci-* 2>/dev/null || true

@@ -61,7 +61,7 @@ impl Store {
             // but wrong/incompatible header). Verified experimentally: a
             // file that doesn't even look like a usearch index at all (pure
             // garbage bytes) crashes the *process* with a SIGSEGV inside the
-            // native loader rather than returning an `Err` — no amount of
+            // native loader rather than returning an `Err`; no amount of
             // Rust-side `Result`/`catch_unwind` handling can intercept that,
             // it's a native-code robustness gap in the usearch library
             // itself. This recovery path is still worth having (it's the
@@ -69,11 +69,11 @@ impl Store {
             // for the errors it *does* catch), but it is not a complete
             // guarantee against every possible corrupt file. The atomic
             // save below is the real fix for the common case this was
-            // written for (a crash mid-save) — it now can't produce a
+            // written for (a crash mid-save); it now can't produce a
             // half-written `vectors.usearch` in the first place.
             if let Err(e) = index.load(idx_path.to_str().unwrap()) {
                 eprintln!(
-                    "breadmill: WARNING: {} failed to load ({}) — treating it as corrupt, \
+                    "breadmill: WARNING: {} failed to load ({}), treating it as corrupt, \
                      discarding it, and rebuilding the index from scratch on the next scan",
                     idx_path.display(),
                     e
@@ -240,7 +240,7 @@ impl Store {
 
     // ---- persistence --------------------------------------------------------
 
-    /// Saves to a `.tmp` sibling and renames it into place — a same-
+    /// Saves to a `.tmp` sibling and renames it into place: a same-
     /// filesystem rename is atomic, so a crash mid-save leaves only an
     /// orphaned `.tmp` file rather than a truncated/corrupt
     /// `vectors.usearch` that would otherwise fail to load on next start
@@ -296,7 +296,7 @@ mod tests {
     // the natural way to construct a "corrupt" fixture (writing arbitrary
     // garbage to vectors.usearch) was tried and crashes the *test process*
     // with a SIGSEGV inside usearch's native loader before our `Result`
-    // handling ever gets a chance to run — see the comment on that branch
+    // handling ever gets a chance to run; see the comment on that branch
     // in `open`. A real usearch file with a deliberately-broken-but-still-
     // parseable header could plausibly hit the `Err` path exercised there
     // instead, but reverse-engineering that format precisely enough to

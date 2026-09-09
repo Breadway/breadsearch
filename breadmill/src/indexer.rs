@@ -52,7 +52,7 @@ impl Indexer {
 
     /// True when embedding should be skipped right now: the user turned
     /// indexing off entirely, or the machine is on battery and
-    /// `power.run_on_battery` is not set. Cheap sysfs reads — safe to call
+    /// `power.run_on_battery` is not set. Cheap sysfs reads, safe to call
     /// per-file and on every watch_loop tick.
     fn indexing_paused(&self) -> bool {
         if !self.config.power.enabled {
@@ -169,7 +169,7 @@ impl Indexer {
             n
         };
         self.state.indexed.store(count, Ordering::Relaxed);
-        eprintln!("breadmill: initial scan done — {} chunks indexed", count);
+        eprintln!("breadmill: initial scan done, {} chunks indexed", count);
     }
 
     fn watch_loop(self) {
@@ -211,7 +211,7 @@ impl Indexer {
                 last_power_check = Instant::now();
                 let now_paused = self.indexing_paused();
                 if was_paused && !now_paused {
-                    eprintln!("breadmill: power gate opened — resuming indexing");
+                    eprintln!("breadmill: power gate opened, resuming indexing");
                     self.initial_scan();
                 }
                 was_paused = now_paused;
@@ -230,7 +230,7 @@ impl Indexer {
                     }
                 }
                 Ok(Err(e)) => eprintln!("breadmill: watch error: {}", e),
-                Err(_) => {} // timeout — check quiet period
+                Err(_) => {} // timeout, check quiet period
             }
 
             if !pending_paths.is_empty() && last_event.elapsed() >= quiet {
@@ -260,7 +260,7 @@ impl Indexer {
 
         if !path.is_file() {
             let path_str = path.to_string_lossy().into_owned();
-            // File deleted — remove from index
+            // File deleted, remove from index
             let mut store = self.state.store.lock_recover();
             let _ = store.delete_file(&path_str);
             return;
@@ -329,8 +329,8 @@ impl Indexer {
         }
 
         // Confirm the embedder is actually present before committing to
-        // clearing this file's old chunks below — same check as before,
-        // just without holding the embedder lock past this one glance (see
+        // clearing this file's old chunks below (same check as before,
+        // just without holding the embedder lock past this one glance, see
         // the per-chunk locking in the loop for why).
         if self.state.embedder.lock_recover().is_none() {
             return;
@@ -346,7 +346,7 @@ impl Indexer {
 
         for (i, chunk) in chunks.iter().enumerate() {
             eprintln!("breadmill: embed chunk {}/{} ({} chars) for {}", i + 1, chunks.len(), chunk.text.len(), path_str);
-            // Lock the embedder only around this single chunk's embed call —
+            // Lock the embedder only around this single chunk's embed call:
             // this used to be held for the whole file's chunk loop, so one
             // large file needing a fresh MIGraphX JIT compile (60-120s for a
             // new sequence length) could block every query (serve.rs locks

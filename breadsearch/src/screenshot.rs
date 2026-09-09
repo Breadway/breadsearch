@@ -1,10 +1,10 @@
 //! `--screenshot` CLI mode: render breadsearch's search panel, capture it
-//! via `bread-screenshots`, then exit — driven by `bread-ecosystem`'s
+//! via `bread-screenshots`, then exit, driven by `bread-ecosystem`'s
 //! `bread-capture` orchestrator, or run standalone for one-off captures.
 //!
 //! Same reasoning as breadbox: one view ("search"), full known-size canvas
 //! capture since the panel isn't its own layer surface. Captures whatever
-//! the panel shows at settle time — normally the "Type to search…" empty
+//! the panel shows at settle time, normally the "Type to search..." empty
 //! state, since there's no query to type in an automated run.
 
 use bread_utils::screenshot_cli::{validate_pair, DEFAULT_HEIGHT, DEFAULT_WIDTH, SETTLE_DELAY};
@@ -24,12 +24,12 @@ pub struct Cli {
     #[arg(long)]
     pub output: Option<PathBuf>,
 
-    /// Capture canvas width — matches the isolated compositor's output width
+    /// Capture canvas width, matches the isolated compositor's output width
     /// (`bread-capture --isolate-width`).
     #[arg(long, default_value_t = DEFAULT_WIDTH)]
     pub width: u32,
 
-    /// Capture canvas height — see `width`.
+    /// Capture canvas height, see `width`.
     #[arg(long, default_value_t = DEFAULT_HEIGHT)]
     pub height: u32,
 }
@@ -61,7 +61,7 @@ impl Cli {
 }
 
 /// Wire up the given view's screenshot sequence against an already-built,
-/// not-yet-presented window. Every path here ends by exiting the process —
+/// not-yet-presented window. Every path here ends by exiting the process;
 /// it never returns control to the normal search UI.
 pub fn dispatch(window: &gtk4::ApplicationWindow, req: ScreenshotRequest) {
     match req.view.as_str() {

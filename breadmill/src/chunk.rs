@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn char_cap_splits_large_chunks() {
-        // Simulate a "word" that is 200 chars long — exceeds cap of 50.
+        // Simulate a "word" that is 200 chars long, exceeds cap of 50.
         let text = "a".repeat(200);
         let chunks = chunk_text(&text, 1, 0, 50);
         assert_eq!(chunks.len(), 4);

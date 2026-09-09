@@ -20,7 +20,7 @@ cuda = ["ort/cuda", "ort/load-dynamic"]
 openvino = ["ort/openvino", "ort/load-dynamic"]
 # All backends in one binary. Safe to combine: every backend here uses
 # ort's load-dynamic (dlopen) mode, so none of this links against an actual
-# NPU/ROCm/CUDA/OpenVINO toolkit at build time — which ONNX Runtime actually
+# NPU/ROCm/CUDA/OpenVINO toolkit at build time; which ONNX Runtime actually
 # gets loaded (and thus which EPs are really available) is decided at
 # runtime by ORT_DYLIB_PATH / the dynamic linker, per the --npu/--rocm/
 # --cuda/--openvino flag or `backend` config value in use for that run.

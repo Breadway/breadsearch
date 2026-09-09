@@ -4,7 +4,7 @@
 **Reporter:** breadway  
 **Component:** `breadmill` (semantic search indexer)  
 **Version:** 0.1.0 (`/home/breadway/Projects/breadsearch/breadmill`)  
-**Severity:** Critical — repeated kernel OOM kills, ~28 GB RAM consumption, system instability
+**Severity:** Critical: repeated kernel OOM kills, ~28 GB RAM consumption, system instability
 
 ---
 
@@ -37,7 +37,7 @@ ExecStart=%h/.cargo/bin/breadmill
 Restart=on-failure
 RestartSec=5
 # No MemoryMax set (unlimited)
-# OOMScoreAdjust=200 (default for user services — preferential OOM victim)
+# OOMScoreAdjust=200 (default for user services, preferential OOM victim)
 ```
 
 ### Relevant config
@@ -172,29 +172,29 @@ breadmill: extract .../Novacana Info.txt: stream did not contain valid UTF-8
 
 ### Required (correctness)
 
-1. **Truncate before tokenization** — cap input to model `max_seq_len` (8192 tokens for nomic-embed-text-v1.5) in `embed.rs`, with explicit logging when truncation occurs.
+1. **Truncate before tokenization**: cap input to model `max_seq_len` (8192 tokens for nomic-embed-text-v1.5) in `embed.rs`, with explicit logging when truncation occurs.
 
-2. **Character-based chunk limits** — add `max_chunk_chars` (e.g. 8_000–32_000) independent of word count; split oversized chunks before embedding.
+2. **Character-based chunk limits**: add `max_chunk_chars` (e.g. 8_000–32_000) independent of word count; split oversized chunks before embedding.
 
-3. **Sanity-check chunk size** — refuse to embed chunks above a byte/token threshold; log and skip rather than calling ONNX.
+3. **Sanity-check chunk size**: refuse to embed chunks above a byte/token threshold; log and skip rather than calling ONNX.
 
 ### Recommended (resilience)
 
-4. **Per-chunk error isolation** — on embed failure for one chunk, skip that chunk but do not retry the entire file in a tight loop; mark file as `failed` in SQLite.
+4. **Per-chunk error isolation**: on embed failure for one chunk, skip that chunk but do not retry the entire file in a tight loop; mark file as `failed` in SQLite.
 
-5. **Service memory limit** — set `MemoryMax=4G` (or similar) on `breadmill.service` so a runaway embed cannot take the whole machine.
+5. **Service memory limit**: set `MemoryMax=4G` (or similar) on `breadmill.service` so a runaway embed cannot take the whole machine.
 
-6. **Lower `OOMScoreAdjust`** — use `0` or negative so breadmill is not preferentially killed while still allowing limits.
+6. **Lower `OOMScoreAdjust`**: use `0` or negative so breadmill is not preferentially killed while still allowing limits.
 
-7. **Backoff on repeated OOM** — `RestartSec=exponential` or stop after N OOM kills per file.
+7. **Backoff on repeated OOM**: `RestartSec=exponential` or stop after N OOM kills per file.
 
 ### Optional (UX)
 
-8. **Exclude patterns** — config option for glob excludes (e.g. `**/Saving/**`, `**/*.json` even if renamed `.txt`).
+8. **Exclude patterns**: config option for glob excludes (e.g. `**/Saving/**`, `**/*.json` even if renamed `.txt`).
 
-9. **Detect minified JSON** — if `serde_json::from_str` succeeds on `.txt`, skip or pretty-print/chunk differently.
+9. **Detect minified JSON**: if `serde_json::from_str` succeeds on `.txt`, skip or pretty-print/chunk differently.
 
-10. **`--version` flag** — aids bug reports (currently `unknown command: --version`).
+10. **`--version` flag**: aids bug reports (currently `unknown command: --version`).
 
 ---
 
@@ -224,8 +224,8 @@ systemctl --user stop breadmill.service
 
 | File | Role |
 |------|------|
-| `breadmill/src/chunk.rs` | Whitespace word chunking — no char/token cap |
-| `breadmill/src/indexer.rs:268` | `chunk_text(&text, 400, 80)` — hardcoded params |
+| `breadmill/src/chunk.rs` | Whitespace word chunking, no char/token cap |
+| `breadmill/src/indexer.rs:268` | `chunk_text(&text, 400, 80)`, hardcoded params |
 | `breadmill/src/embed.rs` | No truncation before `tokenizer.encode()` / ONNX run |
 | `breadmill/src/extract.rs` | Treats `.txt` as raw UTF-8 (JSON passes through) |
 | `~/.config/breadsearch/config.toml` | `max_file_mb` only; no chunk/token limits |

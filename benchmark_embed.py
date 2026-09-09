@@ -48,7 +48,7 @@ print("BENCHMARK: nomic-embed-text-v1.5 embedding speed")
 print("=" * 60)
 
 # ── 1. float32 CPU ────────────────────────────────────────────
-print("\n[1] float32 model — CPU EP")
+print("\n[1] float32 model: CPU EP")
 sess = ort.InferenceSession(str(FLOAT32_MODEL), providers=["CPUExecutionProvider"])
 feed = make_input(SEQ_FLOAT)
 for _ in range(WARMUP): sess.run(None, feed)
@@ -57,7 +57,7 @@ mean, lo, hi = stats(times)
 print(f"    seq={SEQ_FLOAT}  mean={mean*1000:.0f}ms  min={lo*1000:.0f}ms  max={hi*1000:.0f}ms  ({RUNS} runs)")
 
 # ── 2. int8 quantized CPU (dynamic) ───────────────────────────
-print("\n[2] int8 quantized model (dynamic shapes) — CPU EP")
+print("\n[2] int8 quantized model (dynamic shapes): CPU EP")
 sess = ort.InferenceSession(str(QUANT_MODEL), providers=["CPUExecutionProvider"])
 feed = make_input(SEQ_FLOAT)
 for _ in range(WARMUP): sess.run(None, feed)
@@ -66,8 +66,8 @@ mean2, lo2, hi2 = stats(times)
 print(f"    seq={SEQ_FLOAT}  mean={mean2*1000:.0f}ms  min={lo2*1000:.0f}ms  max={hi2*1000:.0f}ms  ({RUNS} runs)")
 print(f"    Speedup vs float32: {mean/mean2:.2f}x")
 
-# ── 3. int8 quantized static — VitisAI EP ─────────────────────
-print("\n[3] int8 quantized model (static shapes) — VitisAI EP (NPU+CPU)")
+# ── 3. int8 quantized static: VitisAI EP ─────────────────────
+print("\n[3] int8 quantized model (static shapes): VitisAI EP (NPU+CPU)")
 providers = [
     ("VitisAIExecutionProvider", {
         "config_file": str(VAIP_CONFIG),
@@ -76,7 +76,7 @@ providers = [
     }),
     "CPUExecutionProvider",
 ]
-print("    Loading session (should be fast — already compiled)...")
+print("    Loading session (should be fast, already compiled)...")
 t_load = time.perf_counter()
 sess_npu = ort.InferenceSession(str(STATIC_MODEL), providers=providers)
 print(f"    Load time: {time.perf_counter()-t_load:.1f}s")

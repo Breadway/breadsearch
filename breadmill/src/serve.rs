@@ -82,7 +82,7 @@ fn dispatch(
         Request::Query { query, limit } => {
             if !state.model_ready.load(Ordering::Relaxed) {
                 return Response::Error {
-                    message: "model not ready — run breadmill --fetch-model".into(),
+                    message: "model not ready, run breadmill --fetch-model".into(),
                 };
             }
 

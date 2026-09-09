@@ -1,13 +1,13 @@
-# AGENTS.md — Repo hygiene
+# AGENTS.md: Repo hygiene
 
-Scope: this file covers *repo hygiene* — branching, remotes, CI — plus a
+Scope: this file covers *repo hygiene* (branching, remotes, CI) plus a
 short map of the binaries. It is not user-facing project documentation.
 
-This repo follows the branch/release workflow documented in `CONTRIBUTING.md`
-— read and follow it for any git, branch, or release work here (the
+This repo follows the branch/release workflow documented in `CONTRIBUTING.md`:
+read and follow it for any git, branch, or release work here (the
 single-trunk model, `feature/x`/`fix/x` branch naming, how RC tags work,
 etc). Don't improvise a different workflow. The short version: there is one
-long-lived branch, `main` — no `dev` or `beta` branch exists. `main`
+long-lived branch, `main`: no `dev` or `beta` branch exists. `main`
 auto-publishes a dev-track build on every push. "Beta" and "stable" are both
 just tags, not branches: push a `vX.Y.Z-rc.N` tag to publish a beta-track
 build, push a plain `vX.Y.Z` tag to cut the signed stable release.
@@ -20,8 +20,8 @@ When starting work on a new feature, create branch `feature/<feature-name>`.
 When working on a bug or issue, create branch `fix/<issue you are fixing>`.
 
 ## Remotes
-- `origin` — Forgejo (`git.breadway.dev`, SSH) — authoritative.
-- `github` — GitHub mirror. Push both when publishing.
+- `origin`: Forgejo (`git.breadway.dev`, SSH), authoritative.
+- `github`: GitHub mirror. Push both when publishing.
 
 ## CI
 - `dev-release.yml` triggers on `push: branches: ['main']`.
@@ -46,5 +46,8 @@ are not the same overlay.
 through `bread-screenshots`; do not rewrite it just to retarget the crate pin.
 
 ## Don't
-- Don't embed credentials in remote URLs — SSH or a credential helper only.
+- Don't embed credentials in remote URLs; use SSH or a credential helper only.
 - Don't rewrite `screenshot.rs` as part of pin/docs work.
+
+## Persistent memory
+Read `~/.knowledge.md` at the start of a task: it points to a shared memory index at `~/.claude/memory/MEMORY.md` (also used by Claude Code). Selectively read the linked entries relevant to what you're working on.
