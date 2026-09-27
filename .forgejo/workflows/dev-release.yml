@@ -3,6 +3,13 @@ name: dev release
 # Publishes a dev-track build on every push to `main` (the trunk
 # branch, there is no separate `dev` branch). See bread-ecosystem's
 # docs/release-channels.md for the release-track policy this is part of.
+#
+# Unlike rc-release.yml / release.yml, this build does NOT use --locked:
+# every git.breadway.dev dependency is first patched to its own repo's
+# `main` by bread-ecosystem's scripts/dev-deps.sh, so a cross-repo change
+# lands on the dev track the moment both sides merge to main, with no
+# committed pin bump needed. Cargo.toml itself keeps its ordinary tag
+# pins throughout; nothing here is committed back. Part of ECO-38.
 on:
   push:
     branches: ['main']
@@ -18,11 +25,35 @@ jobs:
           git clone --branch main --depth 1 \
             "https://git.breadway.dev/${GITHUB_REPOSITORY}.git" src
 
+      # Cloned once, here, and reused both for dev-deps.sh (below) and for
+      # regenerating the dev index.json at the end of this job.
+      - name: clone bread-ecosystem (main)
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/bread-ecosystem-ci-* 2>/dev/null || true
+          ECOSYSTEM_CI_DIR="$(mktemp -d /tmp/bread-ecosystem-ci-XXXXXX)"
+          git clone --branch main https://git.breadway.dev/Breadway/bread-ecosystem.git "${ECOSYSTEM_CI_DIR}"
+          echo "ECOSYSTEM_CI_DIR=${ECOSYSTEM_CI_DIR}" >> "$GITHUB_ENV"
+
+      # DEV_DEPS_DIR is left at its default (a true sibling of src, in the
+      # job's own working directory): ci/build.sh's docker wrapper mounts
+      # src's PARENT directory (not just src itself), so a sibling clone is
+      # visible inside the container at the same relative position as on
+      # the host. breadsearch is itself a Cargo workspace; forcing the
+      # clone *inside* src instead breaks Cargo's workspace-field
+      # inheritance, see bread-ecosystem's ci/build.sh for the full
+      # explanation.
+      - name: resolve dev dependencies to main
+        run: |
+          set -euo pipefail
+          cd src
+          bash "${ECOSYSTEM_CI_DIR}/scripts/dev-deps.sh" --root .
+
       - name: build
-        run: cd src && bash ci/build.sh cargo build --release --locked --workspace --features full
+        run: cd src && bash ci/build.sh cargo build --release --workspace --features full
 
       - name: test
-        run: cd src && bash ci/build.sh cargo test --release --locked --workspace --features full
+        run: cd src && bash ci/build.sh cargo test --release --workspace --features full
 
       - name: compute dev version
         run: |
@@ -60,6 +91,10 @@ jobs:
           cp src/packaging/breadmill.service "${PKG_DIR}/"
           cp src/config.example.toml "${PKG_DIR}/"
           cp src/bakery.toml "${PKG_DIR}/bakery.toml"
+          # Dependency SHA record from scripts/dev-deps.sh, so this dev
+          # build is traceable back to the exact commit of each
+          # git.breadway.dev dependency it was resolved against.
+          cp src/dev-deps.lock.txt "${PKG_DIR}/dev-deps.lock.txt"
           ln -sfn "${VERSION}" "/srv/breadway-dl/dev/breadsearch/latest"
 
       # No GitHub Release upload: dev, like the other non-stable track,
@@ -73,10 +108,5 @@ jobs:
             echo "::error::BAKERY_MINISIGN_SEC_KEY_PATH secret not set, refusing to regenerate dev index.json unsigned (would leave a stale signature mismatched against fresh content and break bakery for everyone on the dev track)"
             exit 1
           fi
-          rm -rf /tmp/bread-ecosystem-ci-* 2>/dev/null || true
-          # mktemp: a fixed clone path races when multiple repos' dev/beta
-          # workflows run close together on the same self-hosted runner.
-          ECOSYSTEM_CI_DIR="$(mktemp -d /tmp/bread-ecosystem-ci-XXXXXX)"
-          git clone --branch main https://git.breadway.dev/Breadway/bread-ecosystem.git "${ECOSYSTEM_CI_DIR}"
           TRACK=dev bash "${ECOSYSTEM_CI_DIR}/scripts/gen-index.sh"
           rm -rf "${ECOSYSTEM_CI_DIR}"
