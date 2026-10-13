@@ -72,7 +72,7 @@ fn handle(stream: UnixStream, state: Arc<SharedState>, snippet_len: usize, searc
 
 fn dispatch(
     req: Request,
-    state: &SharedState,
+    state: &std::sync::Arc<SharedState>,
     snippet_len: usize,
     search_limit: usize,
 ) -> Response {
@@ -80,26 +80,48 @@ fn dispatch(
 
     match req {
         Request::Query { query, limit } => {
-            if !state.model_ready.load(Ordering::Relaxed) {
-                return Response::Error {
-                    message: "model not ready — run breadmill --fetch-model".into(),
-                };
+            // Demand reload: a search that finds the model gone starts it
+            // loading again and says the model is loading instead of failing
+            // silently. The search itself does not wait: it reports busy, and
+            // the next one finds a warm model. Missing model files are not a
+            // reload case: they were never fetched.
+            if state.embedder.lock_recover().is_none() {
+                let params = state.loader.lock_recover().clone();
+                match params {
+                    Some(params) if params.model_path.exists() => {
+                        crate::model::load_in_background(state, &params);
+                        return Response::Error {
+                            message: "model loading — retry shortly".into(),
+                        };
+                    }
+                    _ => {
+                        return Response::Error {
+                            message: "model not ready — run breadmill --fetch-model".into(),
+                        };
+                    }
+                }
             }
 
+            state.in_flight.fetch_add(1, Ordering::Relaxed);
             let embedding = {
                 let mut embedder = state.embedder.lock_recover();
                 match embedder.as_mut() {
                     Some(e) => match e.embed_query(&query) {
                         Ok(v) => v,
-                        Err(e) => return Response::Error { message: e },
+                        Err(e) => {
+                            state.in_flight.fetch_sub(1, Ordering::Relaxed);
+                            return Response::Error { message: e };
+                        }
                     },
                     None => {
+                        state.in_flight.fetch_sub(1, Ordering::Relaxed);
                         return Response::Error {
                             message: "embedder unavailable".into(),
-                        }
+                        };
                     }
                 }
             };
+            state.in_flight.fetch_sub(1, Ordering::Relaxed);
 
             let limit = limit.min(search_limit).max(1);
             let store = state.store.lock_recover();
@@ -111,18 +133,45 @@ fn dispatch(
         }
 
         Request::Status => {
-            use std::sync::atomic::Ordering;
             Response::StatusInfo(StatusInfo {
                 indexed: state.indexed.load(Ordering::Relaxed),
                 pending: state.pending.load(Ordering::Relaxed),
                 model_ready: state.model_ready.load(Ordering::Relaxed),
+                in_flight: state.in_flight.load(Ordering::Relaxed),
+                loading: state.loading.load(Ordering::Relaxed),
+                model_bytes: match state.model_bytes.load(Ordering::Relaxed) {
+                    0 => None,
+                    bytes => Some(bytes),
+                },
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
             })
         }
 
         Request::Reindex => {
-            use std::sync::atomic::Ordering;
             state.reindex_signal.store(true, Ordering::Relaxed);
             Response::Ok
+        }
+
+        Request::UnloadModel => match crate::model::unload(state) {
+            Ok(()) => Response::Ok,
+            Err(reason) => Response::Error {
+                message: format!("busy: {reason}"),
+            },
+        },
+
+        Request::LoadModel => {
+            let params = state.loader.lock_recover().clone();
+            match params {
+                Some(params) => {
+                    crate::model::load_in_background(state, &params);
+                    // Accepted, not completed: the load runs in the
+                    // background and readiness is polled through Status.
+                    Response::Ok
+                }
+                None => Response::Error {
+                    message: "model loader not configured".into(),
+                },
+            }
         }
     }
 }

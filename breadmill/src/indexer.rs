@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering}},
+    sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, AtomicU64, Ordering}},
     time::{Duration, Instant, UNIX_EPOCH},
 };
 
@@ -16,6 +16,18 @@ pub struct SharedState {
     pub store: Mutex<Store>,
     pub embedder: Mutex<Option<OrtEmbedder>>,
     pub model_ready: AtomicBool,
+    /// Queries currently inside an embedding call. Unload is refused while
+    /// this is nonzero; indexing work is tracked by `pending` instead and
+    /// needs no refusal because it stops cleanly when the model disappears.
+    pub in_flight: AtomicUsize,
+    /// A background model load is running. Set before the thread spawns and
+    /// cleared when it finishes, so two triggers cannot start two loads.
+    pub loading: AtomicBool,
+    /// The model file size in bytes from the last successful load, for status
+    /// reporting. Zero when nothing has loaded yet.
+    pub model_bytes: AtomicU64,
+    /// What a background load or reload needs, captured once at startup.
+    pub loader: Mutex<Option<crate::model::ModelParams>>,
     pub indexed: AtomicUsize,
     pub pending: AtomicUsize,
     pub reindex_signal: AtomicBool,
@@ -27,6 +39,10 @@ impl SharedState {
             store: Mutex::new(store),
             embedder: Mutex::new(None),
             model_ready: AtomicBool::new(false),
+            in_flight: AtomicUsize::new(0),
+            loading: AtomicBool::new(false),
+            model_bytes: AtomicU64::new(0),
+            loader: Mutex::new(None),
             indexed: AtomicUsize::new(0),
             pending: AtomicUsize::new(0),
             reindex_signal: AtomicBool::new(false),

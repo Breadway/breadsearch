@@ -11,6 +11,7 @@ const QUERY_PREFIX: &str = "search_query: ";
 /// quadratic attention memory blowup.
 pub const MAX_SEQ_LEN: usize = 8192;
 
+#[derive(Debug, Clone)]
 pub enum Backend {
     Cpu,
     /// AMD XDNA NPU via the VitisAI ONNX Runtime execution provider.

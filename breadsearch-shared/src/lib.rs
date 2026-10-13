@@ -214,6 +214,13 @@ pub enum Request {
     Query { query: String, limit: usize },
     Status,
     Reindex,
+    /// Drop the loaded model session, freeing its backend allocations.
+    /// Refused while queries are in flight. Unknown to older daemons, which
+    /// answer a parse error: that is how a client tells them apart.
+    UnloadModel,
+    /// Load (or reload) the model in the background. Accepted even when a
+    /// load is already running; readiness is polled through `Status`.
+    LoadModel,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -238,6 +245,20 @@ pub struct StatusInfo {
     pub indexed: usize,
     pub pending: usize,
     pub model_ready: bool,
+    /// Queries currently inside an embedding call. Absent on older daemons.
+    #[serde(default)]
+    pub in_flight: usize,
+    /// A background model load is running. Absent on older daemons.
+    #[serde(default)]
+    pub loading: bool,
+    /// The model file size in bytes from the last load, if one happened.
+    /// Absent on older daemons.
+    #[serde(default)]
+    pub model_bytes: Option<u64>,
+    /// The daemon version that answered. Absent on older daemons, which is
+    /// exactly how a client tells them apart from one with unload verbs.
+    #[serde(default)]
+    pub version: Option<String>,
 }
 
 // ---- Socket client ----------------------------------------------------------
