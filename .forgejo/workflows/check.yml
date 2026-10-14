@@ -57,5 +57,10 @@ jobs:
       - name: clippy
         run: cd src && bash ci/build.sh cargo clippy --workspace --all-targets --features full -- -D warnings
 
+      # Keep breadmill's ordinary feature set buildable. `full` alone would
+      # hide missing baseline ort features needed by bread-onnx's dispatcher.
+      - name: breadmill default-feature build
+        run: cd src && bash ci/build.sh cargo build -p breadmill
+
       - name: test
         run: cd src && bash ci/build.sh cargo test --workspace --features full

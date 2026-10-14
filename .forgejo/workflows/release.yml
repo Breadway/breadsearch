@@ -28,7 +28,12 @@ jobs:
             echo "::error::ci/build.sh is missing, bakery release builds must go through the shared CI wrapper"
             exit 1
           fi
-          cd src && bash ci/build.sh cargo build --release --locked --workspace --features full || {
+          cd src
+          bash ci/build.sh cargo build --release --locked -p breadmill || {
+            echo "::error::cargo build --release --locked -p breadmill failed with default features."
+            exit 1
+          }
+          bash ci/build.sh cargo build --release --locked --workspace --features full || {
             echo "::error::cargo build --release --locked failed. If Cargo.lock drifted, update and commit it; do not drop --locked."
             exit 1
           }

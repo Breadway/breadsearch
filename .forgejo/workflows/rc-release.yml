@@ -21,7 +21,11 @@ jobs:
             "https://git.breadway.dev/${GITHUB_REPOSITORY}.git" src
 
       - name: build
-        run: cd src && bash ci/build.sh cargo build --release --locked --workspace --features full
+        run: |
+          set -euo pipefail
+          cd src
+          bash ci/build.sh cargo build --release --locked -p breadmill
+          bash ci/build.sh cargo build --release --locked --workspace --features full
 
       - name: test
         run: cd src && bash ci/build.sh cargo test --release --locked --workspace --features full

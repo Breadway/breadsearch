@@ -40,7 +40,10 @@ breadsearch-shared = { path = "../breadsearch-shared" }
 # npu feature adds load-dynamic + vitis: dlopen at runtime lets ORT_DYLIB_PATH redirect
 #   to the Ryzen AI SDK ORT; rpath from download-binaries means no ORT_DYLIB_PATH
 #   needed for the plain CPU path even in the npu build.
-ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-23"] }
+# bread-onnx's provider dispatcher references these EP APIs unconditionally.
+# Keep their Rust bindings enabled even in CPU-only builds; load-dynamic means
+# no GPU SDK or provider library is linked at build time.
+ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-23", "load-dynamic", "migraphx", "cuda", "openvino", "vitis"] }
 tokenizers = "0"
 bread-onnx = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.2" }
 
