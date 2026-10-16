@@ -37,6 +37,7 @@ pub struct OrtEmbedder {
 
 impl OrtEmbedder {
     pub fn load(model_path: &Path, tokenizer_path: &Path, dim: usize, backend: Backend) -> Result<Self, String> {
+        ensure_ort_runtime()?;
         let provider = to_provider(backend)?;
         let inner = EmbeddingSession::load(model_path, tokenizer_path, dim, MAX_SEQ_LEN, &[provider])
             .map_err(|e| e.to_string())?;
@@ -55,6 +56,76 @@ impl OrtEmbedder {
         let input = format!("{}{}", prefix, text);
         self.inner.embed(&input).map_err(|e| e.to_string())
     }
+}
+
+/// Resolve and load the ONNX Runtime library before any `ort` API is used.
+///
+/// Order: `ORT_DYLIB_PATH` if set (explicit override, e.g. a GPU-enabled
+/// runtime), otherwise the CPU runtime build.rs provisioned into the build
+/// output. A missing or unloadable library is returned as an error. ort's
+/// own loader panics on this, which would kill the loader thread.
+fn ensure_ort_runtime() -> Result<(), String> {
+    let override_path = std::env::var_os("ORT_DYLIB_PATH").filter(|p| !p.is_empty());
+    let (path, bundled) = if let Some(path) = override_path {
+        (PathBuf::from(path), false)
+    } else {
+        let cache = breadsearch_shared::cache_dir().join("runtime");
+        install_bundled_runtime(&cache)?;
+        (cache.join("libonnxruntime.so.1.28.0"), true)
+    };
+    if !path.is_file() {
+        return Err(format!("ONNX Runtime library not found at {}", path.display()));
+    }
+    if bundled && !cache_runtime_files_present(&path) {
+        return Err(format!("bundled ONNX Runtime installation is incomplete in {}", path.parent().unwrap_or(Path::new("." )).display()));
+    }
+    let builder = ort::init_from(&path)
+        .map_err(|error| format!("cannot load ONNX Runtime from {}: {error}", path.display()))?;
+    builder.commit();
+    Ok(())
+}
+
+fn cache_runtime_files_present(runtime_path: &Path) -> bool {
+    runtime_path.with_file_name("libonnxruntime_providers_shared.so").is_file()
+}
+
+fn install_bundled_runtime(cache: &Path) -> Result<(), String> {
+    let runtime = cache.join("libonnxruntime.so.1.28.0");
+    let providers = cache.join("libonnxruntime_providers_shared.so");
+    let expected_runtime = include_bytes!(env!("BREADMILL_ORT_RUNTIME_LIB"));
+    let expected_providers = include_bytes!(env!("BREADMILL_ORT_RUNTIME_PROVIDERS"));
+    if std::fs::read(&runtime).ok().as_deref() == Some(expected_runtime.as_slice())
+        && std::fs::read(&providers).ok().as_deref() == Some(expected_providers.as_slice())
+    {
+        return Ok(());
+    }
+
+    std::fs::create_dir_all(cache).map_err(|e| format!("cannot create ONNX Runtime cache: {e}"))?;
+    let staging = cache.join(format!(".runtime-{}.tmp", std::process::id()));
+    std::fs::create_dir(&staging).map_err(|e| format!("cannot create ONNX Runtime staging directory: {e}"))?;
+    let result = (|| {
+        std::fs::write(
+            staging.join("libonnxruntime.so.1.28.0"),
+            expected_runtime,
+        )
+        .map_err(|e| format!("cannot install bundled ONNX Runtime: {e}"))?;
+        std::fs::write(
+            staging.join("libonnxruntime_providers_shared.so"),
+            expected_providers,
+        )
+        .map_err(|e| format!("cannot install bundled ONNX Runtime provider library: {e}"))?;
+        for name in ["libonnxruntime.so.1.28.0", "libonnxruntime_providers_shared.so"] {
+            let staged = staging.join(name);
+            let installed = cache.join(name);
+            if installed.exists() {
+                std::fs::remove_file(&installed).map_err(|e| format!("cannot replace {}: {e}", installed.display()))?;
+            }
+            std::fs::rename(&staged, &installed).map_err(|e| format!("cannot install {}: {e}", installed.display()))?;
+        }
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&staging);
+    result
 }
 
 // ---- Backend -> bread_onnx::Provider ----------------------------------------

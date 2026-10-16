@@ -32,17 +32,15 @@ path = "src/main.rs"
 
 [dependencies]
 breadsearch-shared = { path = "../breadsearch-shared" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
-# Embedding: ONNX Runtime + HF tokenizers
-# download-binaries: fetches the MLAS-optimized ORT 1.24.x at build time (CPU default).
-# api-23: compatible with both the downloaded ORT 1.24.x and the Ryzen AI SDK ORT 1.23.3;
-#   ORT 1.24 is backwards-compatible and honours GetApi(23) requests.
-# npu feature adds load-dynamic + vitis: dlopen at runtime lets ORT_DYLIB_PATH redirect
-#   to the Ryzen AI SDK ORT; rpath from download-binaries means no ORT_DYLIB_PATH
-#   needed for the plain CPU path even in the npu build.
-# bread-onnx's provider dispatcher references these EP APIs unconditionally.
-# Keep their Rust bindings enabled even in CPU-only builds; load-dynamic means
-# no GPU SDK or provider library is linked at build time.
+# Embedding: ONNX Runtime + HF tokenizers.
+# All builds use ort's load-dynamic mode. The official ONNX Runtime 1.28.0
+# CPU library is checksum-verified at build time and embedded in breadmill;
+# at runtime it is extracted to the user's cache unless ORT_DYLIB_PATH is set.
+# bread-onnx v0.7.2 references the MIGraphX/CUDA/OpenVINO/Vitis provider APIs
+# without feature gates (see ECO-78), so those ort API features stay enabled.
 ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "tracing", "download-binaries", "tls-native", "copy-dylibs", "api-23", "load-dynamic", "migraphx", "cuda", "openvino", "vitis"] }
 tokenizers = "0"
 bread-onnx = { git = "https://git.breadway.dev/Breadway/bread-ecosystem", tag = "v0.7.2" }
@@ -75,6 +73,10 @@ hex = "0"
 # HTTP for model download
 ureq = "2"
 
+[build-dependencies]
+flate2 = "1"
+tar = "0.4"
+ureq = "2"
+sha2 = "0"
+
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"

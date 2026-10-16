@@ -62,5 +62,11 @@ jobs:
       - name: breadmill default-feature build
         run: cd src && bash ci/build.sh cargo build -p breadmill
 
+      - name: breadmill runtime provisioning regression
+        run: |
+          cd src
+          bash ci/build.sh cargo build -p breadmill --features breadmill/full
+          bash ci/build.sh bash -c 'set -euo pipefail; export BREADMILL_TEST_CPU_ORT="$(find /cargo-target/debug/build/breadmill-*/out/ort-runtime/libonnxruntime.so.1.28.0 -print -quit)"; test -n "$BREADMILL_TEST_CPU_ORT"; bash breadmill/tests/runtime_smoke.sh --bin /cargo-target/debug/breadmill'
+
       - name: test
         run: cd src && bash ci/build.sh cargo test --workspace --features full

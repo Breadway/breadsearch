@@ -44,6 +44,11 @@ jobs:
           done
           cp src/packaging/breadmill.service "${PKG_DIR}/"
           cp src/config.example.toml "${PKG_DIR}/"
+          ORT_LICENSE="$(find src/target/release/build/breadmill-*/out -name LICENSE -print -quit)"
+          ORT_NOTICES="$(find src/target/release/build/breadmill-*/out -name ThirdPartyNotices.txt -print -quit)"
+          test -n "${ORT_LICENSE}" && test -n "${ORT_NOTICES}"
+          cp "${ORT_LICENSE}" "${PKG_DIR}/onnxruntime-LICENSE.txt"
+          cp "${ORT_NOTICES}" "${PKG_DIR}/onnxruntime-ThirdPartyNotices.txt"
           cp src/bakery.toml "${PKG_DIR}/bakery.toml"
           ln -sfn "${VERSION}" "/srv/breadway-dl/beta/breadsearch/latest"
 
