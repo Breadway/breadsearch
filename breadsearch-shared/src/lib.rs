@@ -238,6 +238,8 @@ pub struct StatusInfo {
     pub indexed: usize,
     pub pending: usize,
     pub model_ready: bool,
+    #[serde(default)]
+    pub model_error: Option<String>,
 }
 
 // ---- Socket client ----------------------------------------------------------

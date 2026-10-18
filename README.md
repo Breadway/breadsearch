@@ -17,7 +17,7 @@ System dependencies: `gtk4`, `gtk4-layer-shell`, `librsvg`.
 cargo build --release
 ```
 
-The `ort` crate downloads a bundled ONNX Runtime at build time (no system `onnxruntime` needed for the default CPU build).
+The breadmill build downloads the CPU ONNX Runtime 1.28.0 library at build time and embeds it in the binary. On first model load, breadmill installs it into `~/.cache/breadsearch/runtime/` and uses it by default, so no system `onnxruntime` package is required. Set `ORT_DYLIB_PATH` to override the bundled CPU runtime with a provider-enabled runtime for an optional accelerator.
 
 Optional features:
 
@@ -46,21 +46,20 @@ cargo build --release -p breadmill --features openvino
 cargo build --release -p breadmill --features full
 ```
 
-`rocm`/`cuda`/`npu`/`openvino` all use `ort`'s `load-dynamic` mode: at runtime,
-breadmill dlopens whatever `libonnxruntime.so` the dynamic linker resolves (or
-`ORT_DYLIB_PATH` if set). GPU acceleration only works if that ONNX Runtime
-build actually has the matching execution provider compiled in: breadmill
-logs a clear `Successfully registered` / `not enabled in this build` line for
-this at startup (see [GPU backend notes](#gpu-backend-notes) below).
+`rocm`/`cuda`/`npu`/`openvino` use `ort`'s `load-dynamic` mode. By default,
+breadmill loads the bundled CPU runtime. To use an accelerator, set
+`ORT_DYLIB_PATH` to a compatible ONNX Runtime build with that execution
+provider compiled in. breadmill logs provider registration results at startup
+(see [GPU backend notes](#gpu-backend-notes) below).
 
 Because all four are dlopen-based, `full` doesn't require the NPU/ROCm/CUDA/
 OpenVINO toolkits to be installed at build time; only at run time, and only
 for whichever single backend you actually select via
 `--npu`/`--rocm`/`--cuda`/`--openvino` or `backend` in config.toml. The
 **released binaries are built with `full`**: same binary works CPU-only out
-of the box, and picks up NPU/ROCm/CUDA/OpenVINO acceleration on a machine
-that has the matching ONNX Runtime available, without needing a different
-download. An explicit `--npu`/`--rocm`/`--cuda`/`--openvino` flag always
+of the box, and can use NPU/ROCm/CUDA/OpenVINO acceleration when
+`ORT_DYLIB_PATH` points to a matching provider-enabled ONNX Runtime, without
+needing a different breadmill binary. An explicit `--npu`/`--rocm`/`--cuda`/`--openvino` flag always
 overrides `backend` in config.toml, not the other way around.
 
 ## Setup
@@ -162,11 +161,10 @@ Set `backend = "npu"` in config (or pass `--npu`) when running a build compiled 
 
 ### GPU backend notes
 
-`rocm`, `cuda`, and `openvino` all need a system ONNX Runtime that was
-actually built with the matching execution provider: the crate's own
-downloaded binary is CPU-only. Point `ORT_DYLIB_PATH` at one, or install a
-distro package that provides `libonnxruntime.so` with the EP baked in and
-let the dynamic linker find it.
+`rocm`, `cuda`, and `openvino` need an ONNX Runtime that was built with the
+matching execution provider. By default breadmill uses its bundled CPU
+runtime; it does not discover a system runtime through the dynamic linker.
+Set `ORT_DYLIB_PATH` to a provider-enabled library to opt into acceleration.
 
 **ROCm (`--rocm` / `backend = "rocm"`)** targets ONNX Runtime's **MIGraphX**
 execution provider, not the classic `ROCMExecutionProvider`. Distro

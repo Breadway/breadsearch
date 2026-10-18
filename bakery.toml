@@ -3,6 +3,8 @@ description = "Semantic system-wide search for BOS"
 binaries = ["breadsearch", "breadmill"]
 system_deps = ["gtk4", "gtk4-layer-shell", "librsvg"]
 bread_deps = []
+license_file = "onnxruntime-LICENSE.txt"
+data_archive = "onnxruntime-notices.tar.gz"
 
 [[service]]
 unit = "breadmill.service"

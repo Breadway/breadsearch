@@ -116,6 +116,7 @@ fn dispatch(
                 indexed: state.indexed.load(Ordering::Relaxed),
                 pending: state.pending.load(Ordering::Relaxed),
                 model_ready: state.model_ready.load(Ordering::Relaxed),
+                model_error: state.model_error.lock_recover().clone(),
             })
         }
 

@@ -21,7 +21,11 @@ jobs:
             "https://git.breadway.dev/${GITHUB_REPOSITORY}.git" src
 
       - name: build
-        run: cd src && bash ci/build.sh cargo build --release --locked --workspace --features full
+        run: |
+          set -euo pipefail
+          cd src
+          bash ci/build.sh cargo build --release --locked -p breadmill
+          bash ci/build.sh cargo build --release --locked --workspace --features full
 
       - name: test
         run: cd src && bash ci/build.sh cargo test --release --locked --workspace --features full
@@ -40,6 +44,12 @@ jobs:
           done
           cp src/packaging/breadmill.service "${PKG_DIR}/"
           cp src/config.example.toml "${PKG_DIR}/"
+          ORT_LICENSE="$(find src/target/release/build/breadmill-*/out -name LICENSE -print -quit)"
+          ORT_NOTICES="$(find src/target/release/build/breadmill-*/out -name ThirdPartyNotices.txt -print -quit)"
+          test -n "${ORT_LICENSE}" && test -n "${ORT_NOTICES}"
+          cp "${ORT_LICENSE}" "${PKG_DIR}/onnxruntime-LICENSE.txt"
+          cp "${ORT_NOTICES}" "${PKG_DIR}/onnxruntime-ThirdPartyNotices.txt"
+          tar -czf "${PKG_DIR}/onnxruntime-notices.tar.gz" -C "$(dirname "${ORT_NOTICES}")" ThirdPartyNotices.txt
           cp src/bakery.toml "${PKG_DIR}/bakery.toml"
           ln -sfn "${VERSION}" "/srv/breadway-dl/beta/breadsearch/latest"
 

@@ -175,10 +175,17 @@ fn run_daemon(
                     state_clone.model_ready.store(true, Ordering::Relaxed);
                     eprintln!("breadmill: model loaded");
                 }
-                Err(e) => eprintln!("breadmill: model load failed: {}, run --fetch-model", e),
+                    Err(e) => {
+                    *state_clone.model_error.lock_recover() = Some(e.clone());
+                    eprintln!("breadmill: model unavailable: {e}");
+                }
             }
         });
     } else {
+        *state.model_error.lock_recover() = Some(format!(
+            "model files not found in {}, run: breadmill --fetch-model",
+            model_dir.display()
+        ));
         eprintln!(
             "breadmill: model files not found in {}, run: breadmill --fetch-model",
             model_dir.display()
@@ -271,6 +278,9 @@ fn cli_status() {
             println!("indexed:     {}", s.indexed);
             println!("pending:     {}", s.pending);
             println!("model ready: {}", s.model_ready);
+            if let Some(error) = s.model_error {
+                println!("model error: {error}");
+            }
         }
         Ok(_) => eprintln!("unexpected response"),
         Err(e) => eprintln!("could not reach breadmill: {}", e),
