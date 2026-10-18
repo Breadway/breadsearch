@@ -52,29 +52,51 @@ fn main() {
     };
 
     extract(&tarball, &lib_dir);
-    let runtime_file = fs::read(lib_dir.join("libonnxruntime.so.1.28.0")).expect("read extracted ONNX Runtime library");
+    let runtime_file = fs::read(lib_dir.join("libonnxruntime.so.1.28.0"))
+        .expect("read extracted ONNX Runtime library");
     let providers_file = fs::read(lib_dir.join("libonnxruntime_providers_shared.so"))
         .expect("read extracted ONNX Runtime providers library");
     for notice in ["LICENSE", "ThirdPartyNotices.txt"] {
-        assert!(lib_dir.join(notice).is_file(), "ORT archive is missing {notice}");
+        assert!(
+            lib_dir.join(notice).is_file(),
+            "ORT archive is missing {notice}"
+        );
     }
-    fs::write(out.join("ort-runtime.bin"), &runtime_file).expect("write embedded ONNX Runtime library");
+    fs::write(out.join("ort-runtime.bin"), &runtime_file)
+        .expect("write embedded ONNX Runtime library");
     fs::write(out.join("ort-runtime-providers.bin"), &providers_file)
         .expect("write embedded ONNX Runtime providers library");
     for notice in ["LICENSE", "ThirdPartyNotices.txt"] {
         fs::copy(lib_dir.join(notice), out.join(notice)).expect("copy ONNX Runtime notice");
     }
     for file in RUNTIME_FILES {
-        assert!(lib_dir.join(file).is_file(), "ORT archive is missing {file}");
+        assert!(
+            lib_dir.join(file).is_file(),
+            "ORT archive is missing {file}"
+        );
     }
-    println!("cargo:rustc-env=BREADMILL_ORT_RUNTIME_LIB={}", out.join("ort-runtime.bin").display());
-    println!("cargo:rustc-env=BREADMILL_ORT_RUNTIME_PROVIDERS={}", out.join("ort-runtime-providers.bin").display());
-    println!("cargo:rustc-env=BREADMILL_ORT_LICENSE={}", out.join("LICENSE").display());
-    println!("cargo:rustc-env=BREADMILL_ORT_NOTICES={}", out.join("ThirdPartyNotices.txt").display());
+    println!(
+        "cargo:rustc-env=BREADMILL_ORT_RUNTIME_LIB={}",
+        out.join("ort-runtime.bin").display()
+    );
+    println!(
+        "cargo:rustc-env=BREADMILL_ORT_RUNTIME_PROVIDERS={}",
+        out.join("ort-runtime-providers.bin").display()
+    );
+    println!(
+        "cargo:rustc-env=BREADMILL_ORT_LICENSE={}",
+        out.join("LICENSE").display()
+    );
+    println!(
+        "cargo:rustc-env=BREADMILL_ORT_NOTICES={}",
+        out.join("ThirdPartyNotices.txt").display()
+    );
 }
 
 fn download(url: &str) -> Vec<u8> {
-    let response = ureq::get(url).call().unwrap_or_else(|e| panic!("download {url}: {e}"));
+    let response = ureq::get(url)
+        .call()
+        .unwrap_or_else(|e| panic!("download {url}: {e}"));
     let mut bytes = Vec::new();
     response
         .into_reader()
@@ -86,7 +108,10 @@ fn download(url: &str) -> Vec<u8> {
 fn verify_sha256(bytes: &[u8]) {
     let digest = Sha256::digest(bytes);
     let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
-    assert_eq!(hex, ORT_SHA256, "ONNX Runtime {ORT_VERSION} archive checksum mismatch");
+    assert_eq!(
+        hex, ORT_SHA256,
+        "ONNX Runtime {ORT_VERSION} archive checksum mismatch"
+    );
 }
 
 fn extract(tarball: &Path, dest: &Path) {
@@ -95,11 +120,16 @@ fn extract(tarball: &Path, dest: &Path) {
     for entry in archive.entries().expect("read ORT tarball") {
         let mut entry = entry.expect("ORT tar entry");
         let path = entry.path().expect("ORT tar path").into_owned();
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
         let is_library = RUNTIME_FILES[..2].contains(&name);
         let is_notice = RUNTIME_FILES[2..].contains(&name);
         if (is_library && path.parent().is_some_and(|p| p.ends_with("lib")))
-            || (is_notice && path.parent().is_some_and(|p| p == Path::new("onnxruntime-linux-x64-1.28.0")))
+            || (is_notice
+                && path
+                    .parent()
+                    .is_some_and(|p| p == Path::new("onnxruntime-linux-x64-1.28.0")))
         {
             let mut buf = Vec::new();
             entry.read_to_end(&mut buf).expect("read ORT library");

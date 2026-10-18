@@ -245,6 +245,7 @@ dependencies = [
  "flate2",
  "hex",
  "ignore",
+ "libc",
  "notify",
  "ort",
  "pdf-extract",

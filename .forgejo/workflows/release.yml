@@ -60,6 +60,7 @@ jobs:
           test -n "${ORT_LICENSE}" && test -n "${ORT_NOTICES}"
           cp "${ORT_LICENSE}" "${PKG_DIR}/onnxruntime-LICENSE.txt"
           cp "${ORT_NOTICES}" "${PKG_DIR}/onnxruntime-ThirdPartyNotices.txt"
+          tar -czf "${PKG_DIR}/onnxruntime-notices.tar.gz" -C "$(dirname "${ORT_NOTICES}")" ThirdPartyNotices.txt
           cp src/bakery.toml "${PKG_DIR}/bakery.toml"
           ln -sfn "${VERSION}" "/srv/breadway-dl/breadsearch/latest"
 

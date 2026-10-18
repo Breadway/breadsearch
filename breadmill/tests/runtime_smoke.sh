@@ -65,6 +65,10 @@ run_case() {
   local home="$tmp/$name/home" cfg="$tmp/$name/config" cache="$tmp/$name/cache" state="$tmp/$name/state" runtime="$tmp/$name/runtime"
   mkdir -p "$home" "$cfg" "$cache/breadsearch/models" "$state" "$runtime"
   cp "$MODEL_DIR/model.onnx" "$MODEL_DIR/tokenizer.json" "$cache/breadsearch/models/"
+  if [[ "$name" == fifo-cache ]]; then
+    mkdir -p "$cache/breadsearch/runtime"
+    mkfifo "$cache/breadsearch/runtime/libonnxruntime.so.1.28.0"
+  fi
   mkdir -p "$cfg/breadsearch"
   cat > "$cfg/breadsearch/config.toml" <<'EOF'
 [index]
@@ -75,7 +79,7 @@ EOF
   if [[ "$dylib" == "<unset>" ]]; then unset ORT_DYLIB_PATH || true; else export ORT_DYLIB_PATH="$dylib"; fi
   local -a command=("$BIN" serve)
   [[ -z "$backend_flag" ]] || command+=("$backend_flag")
-  HOME="$home" XDG_CONFIG_HOME="$cfg" XDG_CACHE_HOME="$cache" XDG_STATE_HOME="$state" XDG_RUNTIME_DIR="$runtime" "${command[@]}" >"$tmp/$name.log" 2>&1 &
+  /bin/bash -c 'umask 000; export HOME="$1" XDG_CONFIG_HOME="$2" XDG_CACHE_HOME="$3" XDG_STATE_HOME="$4" XDG_RUNTIME_DIR="$5"; shift 5; exec "$@"' -- "$home" "$cfg" "$cache" "$state" "$runtime" "${command[@]}" >"$tmp/$name.log" 2>&1 &
   pid=$!
   local socket="$runtime/breadmill.sock"
   for _ in {1..300}; do [[ -S "$socket" ]] && break; sleep 0.1; done
@@ -117,7 +121,8 @@ import json,sys
 d=json.loads(sys.argv[1]); assert d['model_ready'] is False, d; assert 'ONNX Runtime' in (d.get('model_error') or ''), d
 PY
   fi
-  kill "$pid"; wait "$pid" 2>/dev/null || true; pid=""
+  kill "$pid"; wait "$pid" 2>/dev/null || true
+  pid=""
 }
 
 run_case bundled-unset '<unset>' ready
@@ -125,3 +130,42 @@ run_case missing-override "$tmp/does-not-exist.so" unavailable
 printf 'not an ORT shared library\n' > "$tmp/corrupt.so"
 run_case corrupt-override "$tmp/corrupt.so" unavailable
 if [[ -n "$CPU_ORT" ]]; then run_case supplied-cpu "$CPU_ORT" ready --cuda; else echo "SKIP supplied CPU ORT: set BREADMILL_TEST_CPU_ORT"; fi
+run_case fifo-cache '<unset>' unavailable
+run_case private-modes '<unset>' ready
+mode_cache="$tmp/private-modes/cache/breadsearch/runtime"
+[[ "$(stat -c '%a' "$mode_cache")" == 700 ]]
+[[ "$(stat -c '%a' "$mode_cache/libonnxruntime.so.1.28.0")" == 644 ]]
+[[ "$(stat -c '%a' "$mode_cache/libonnxruntime_providers_shared.so")" == 644 ]]
+
+# Two independent processes contend for one first-install cache. Each gets a
+# distinct runtime socket while sharing only the runtime cache. Both must load
+# the same complete pair and leave the explicit safe modes behind.
+concurrent_cache="$tmp/concurrent-install/cache/breadsearch/runtime"
+mkdir -p "$tmp/concurrent-install/cache/breadsearch/models"
+cp "$MODEL_DIR/model.onnx" "$MODEL_DIR/tokenizer.json" "$tmp/concurrent-install/cache/breadsearch/models/"
+concurrent_pids=()
+for worker in 1 2; do
+  home="$tmp/concurrent-install/home-$worker"; cfg="$tmp/concurrent-install/config-$worker"; state="$tmp/concurrent-install/state-$worker"; runtime_dir="$tmp/concurrent-install/run-$worker"
+  mkdir -p "$home" "$cfg/breadsearch" "$state" "$runtime_dir"
+  cat > "$cfg/breadsearch/config.toml" <<'EOF'
+[index]
+roots = []
+[model]
+backend = "cpu"
+EOF
+  /bin/bash -c 'umask 000; export HOME="$1" XDG_CONFIG_HOME="$2" XDG_CACHE_HOME="$3" XDG_STATE_HOME="$4" XDG_RUNTIME_DIR="$5"; exec "$6" serve' -- "$home" "$cfg" "$tmp/concurrent-install/cache" "$state" "$runtime_dir" "$BIN" >"$tmp/concurrent-$worker.log" 2>&1 &
+  concurrent_pids+=("$!")
+done
+for worker in 1 2; do
+  worker_pid="${concurrent_pids[$((worker - 1))]}"
+  for _ in {1..300}; do
+    if grep -q 'model loaded' "$tmp/concurrent-$worker.log"; then break; fi
+    if grep -q 'thread .* panicked\|model unavailable' "$tmp/concurrent-$worker.log"; then cat "$tmp/concurrent-$worker.log" >&2; exit 1; fi
+    sleep 0.1
+  done
+  grep -q 'model loaded' "$tmp/concurrent-$worker.log"
+  kill "$worker_pid"; wait "$worker_pid" 2>/dev/null || true
+done
+[[ "$(stat -c '%a' "$concurrent_cache")" == 700 ]]
+[[ "$(stat -c '%a' "$concurrent_cache/libonnxruntime.so.1.28.0")" == 644 ]]
+[[ "$(stat -c '%a' "$concurrent_cache/libonnxruntime_providers_shared.so")" == 644 ]]

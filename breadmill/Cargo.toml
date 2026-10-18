@@ -19,11 +19,10 @@ cuda = ["ort/cuda", "ort/load-dynamic"]
 # we always request "GPU" since CPU is already covered by the cpu backend.
 openvino = ["ort/openvino", "ort/load-dynamic"]
 # All backends in one binary. Safe to combine: every backend here uses
-# ort's load-dynamic (dlopen) mode, so none of this links against an actual
-# NPU/ROCm/CUDA/OpenVINO toolkit at build time; which ONNX Runtime actually
-# gets loaded (and thus which EPs are really available) is decided at
-# runtime by ORT_DYLIB_PATH / the dynamic linker, per the --npu/--rocm/
-# --cuda/--openvino flag or `backend` config value in use for that run.
+# ort's load-dynamic mode and needs no provider SDK at build time. Runtime
+# selection is explicit: ORT_DYLIB_PATH, otherwise the bundled CPU cache.
+# The --npu/--rocm/--cuda/--openvino flags or `backend` config select an EP;
+# this crate does not discover a system runtime through the dynamic linker.
 full = ["npu", "rocm", "cuda", "openvino"]
 
 [[bin]]
@@ -32,6 +31,7 @@ path = "src/main.rs"
 
 [dependencies]
 breadsearch-shared = { path = "../breadsearch-shared" }
+libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

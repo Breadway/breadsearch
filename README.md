@@ -161,11 +161,10 @@ Set `backend = "npu"` in config (or pass `--npu`) when running a build compiled 
 
 ### GPU backend notes
 
-`rocm`, `cuda`, and `openvino` all need a system ONNX Runtime that was
-actually built with the matching execution provider: the crate's own
-downloaded binary is CPU-only. Point `ORT_DYLIB_PATH` at one, or install a
-distro package that provides `libonnxruntime.so` with the EP baked in and
-let the dynamic linker find it.
+`rocm`, `cuda`, and `openvino` need an ONNX Runtime that was built with the
+matching execution provider. By default breadmill uses its bundled CPU
+runtime; it does not discover a system runtime through the dynamic linker.
+Set `ORT_DYLIB_PATH` to a provider-enabled library to opt into acceleration.
 
 **ROCm (`--rocm` / `backend = "rocm"`)** targets ONNX Runtime's **MIGraphX**
 execution provider, not the classic `ROCMExecutionProvider`. Distro
