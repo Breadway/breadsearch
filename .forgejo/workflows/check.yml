@@ -2,13 +2,21 @@ name: check
 
 # Fast-fail lint/test on short-lived work branches, before it ever reaches
 # main and triggers a dev-track release build.
+#
+# Builds in the same dev mode as dev-release.yml (git.breadway.dev
+# dependencies patched to their own repo's main via bread-ecosystem's
+# scripts/dev-deps.sh, no --locked), so a PR that depends on a
+# just-merged, not-yet-tagged change in bread-ecosystem passes here
+# instead of only being testable after a tag bump. See bread-ecosystem's
+# docs/release-channels.md ("Cross-repo dependency resolution") for the
+# full model. Part of ECO-38.
 on:
   push:
     branches: ['feature/**', 'fix/**']
 
 jobs:
   check:
-    runs-on: [self-hosted, hestia]
+    runs-on: [self-hosted]
     steps:
       - name: checkout
         run: |
@@ -17,8 +25,49 @@ jobs:
           git clone --branch "${GITHUB_REF_NAME}" --depth 1 \
             "https://git.breadway.dev/${GITHUB_REPOSITORY}.git" src
 
+      - name: clone bread-ecosystem (main)
+        run: |
+          set -euo pipefail
+          ECOSYSTEM_CI_DIR="$(mktemp -d /tmp/bread-ecosystem-check-XXXXXX)"
+          git clone --branch main https://git.breadway.dev/Breadway/bread-ecosystem.git "${ECOSYSTEM_CI_DIR}"
+          echo "ECOSYSTEM_CI_DIR=${ECOSYSTEM_CI_DIR}" >> "$GITHUB_ENV"
+
+      # Fails if any git.breadway.dev dependency in src's Cargo.toml uses
+      # rev/branch/path instead of tag. Cargo.toml itself must always stay
+      # tag-pinned; dev-mode resolution to main happens only at build time,
+      # below, never by editing the manifest.
+      - name: lint git.breadway.dev dependency pins
+        run: bash "${ECOSYSTEM_CI_DIR}/scripts/lint-pins.sh" --root src
+
+      # DEV_DEPS_DIR is left at its default (a true sibling of src, in the
+      # job's own working directory): ci/build.sh's docker wrapper mounts
+      # src's PARENT directory (not just src itself), so a sibling clone is
+      # visible inside the container at the same relative position as on
+      # the host. breadsearch is itself a Cargo workspace; forcing the
+      # clone *inside* src instead breaks Cargo's workspace-field
+      # inheritance, see bread-ecosystem's ci/build.sh for the full
+      # explanation.
+      - name: resolve dev dependencies to main
+        run: |
+          set -euo pipefail
+          cd src
+          bash "${ECOSYSTEM_CI_DIR}/scripts/dev-deps.sh" --root .
+          rm -rf "${ECOSYSTEM_CI_DIR}"
+
       - name: clippy
-        run: cd src && bash ci/build.sh cargo clippy --workspace --all-targets --locked --features full -- -D warnings
+        run: cd src && bash ci/build.sh cargo clippy --workspace --all-targets --features full -- -D warnings
+
+      # Keep breadmill's ordinary feature set buildable. `full` alone would
+      # hide missing baseline ort features needed by bread-onnx's dispatcher.
+      - name: breadmill default-feature build
+        run: cd src && bash ci/build.sh cargo build -p breadmill
+
+      - name: breadmill runtime provisioning regression
+        run: |
+          cd src
+          bash ci/build.sh cargo build -p breadmill --features breadmill/full
+          bash ci/build.sh cargo test -p breadmill runtime_cache_tests
+          bash ci/build.sh bash -c 'set -euo pipefail; export BREADMILL_TEST_CPU_ORT="$(find /cargo-target/debug/build/breadmill-*/out/ort-runtime/libonnxruntime.so.1.28.0 -print -quit)"; test -n "$BREADMILL_TEST_CPU_ORT"; bash breadmill/tests/runtime_smoke.sh --bin /cargo-target/debug/breadmill'
 
       - name: test
-        run: cd src && bash ci/build.sh cargo test --workspace --locked --features full
+        run: cd src && bash ci/build.sh cargo test --workspace --features full

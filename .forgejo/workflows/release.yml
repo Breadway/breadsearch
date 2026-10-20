@@ -7,7 +7,7 @@ on:
 jobs:
   build:
     if: ${{ !contains(github.ref_name, '-rc.') }}
-    runs-on: [self-hosted, hestia]
+    runs-on: [self-hosted]
     steps:
       - name: checkout
         run: |
@@ -21,14 +21,19 @@ jobs:
         # that can use any backend at runtime via --npu/--rocm/--cuda or
         # `backend` in config.toml. All three are ort load-dynamic (dlopen)
         # EPs, so this doesn't require the NPU/ROCm/CUDA toolkits to be
-        # present on the build host — see breadmill/Cargo.toml.
+        # present on the build host, see breadmill/Cargo.toml.
         run: |
           set -euo pipefail
           if [ ! -f src/ci/build.sh ]; then
-            echo "::error::ci/build.sh is missing — bakery release builds must go through the shared CI wrapper"
+            echo "::error::ci/build.sh is missing, bakery release builds must go through the shared CI wrapper"
             exit 1
           fi
-          cd src && bash ci/build.sh cargo build --release --locked --workspace --features full || {
+          cd src
+          bash ci/build.sh cargo build --release --locked -p breadmill || {
+            echo "::error::cargo build --release --locked -p breadmill failed with default features."
+            exit 1
+          }
+          bash ci/build.sh cargo build --release --locked --workspace --features full || {
             echo "::error::cargo build --release --locked failed. If Cargo.lock drifted, update and commit it; do not drop --locked."
             exit 1
           }
@@ -50,6 +55,12 @@ jobs:
           done
           cp src/packaging/breadmill.service "${PKG_DIR}/"
           cp src/config.example.toml "${PKG_DIR}/"
+          ORT_LICENSE="$(find src/target/release/build/breadmill-*/out -name LICENSE -print -quit)"
+          ORT_NOTICES="$(find src/target/release/build/breadmill-*/out -name ThirdPartyNotices.txt -print -quit)"
+          test -n "${ORT_LICENSE}" && test -n "${ORT_NOTICES}"
+          cp "${ORT_LICENSE}" "${PKG_DIR}/onnxruntime-LICENSE.txt"
+          cp "${ORT_NOTICES}" "${PKG_DIR}/onnxruntime-ThirdPartyNotices.txt"
+          tar -czf "${PKG_DIR}/onnxruntime-notices.tar.gz" -C "$(dirname "${ORT_NOTICES}")" ThirdPartyNotices.txt
           cp src/bakery.toml "${PKG_DIR}/bakery.toml"
           ln -sfn "${VERSION}" "/srv/breadway-dl/breadsearch/latest"
 
@@ -59,7 +70,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${MINISIGN_SEC_KEY:-}" ]; then
-            echo "::error::BAKERY_MINISIGN_SEC_KEY_PATH secret not set — refusing to regenerate index.json unsigned (would leave a stale signature mismatched against fresh content and break bakery for everyone)"
+            echo "::error::BAKERY_MINISIGN_SEC_KEY_PATH secret not set, refusing to regenerate index.json unsigned (would leave a stale signature mismatched against fresh content and break bakery for everyone)"
             exit 1
           fi
           rm -rf /tmp/bread-ecosystem-ci
@@ -80,4 +91,6 @@ jobs:
             "${PKG_DIR}/breadmill-x86_64" \
             "${PKG_DIR}/breadsearch-x86_64.sha256" \
             "${PKG_DIR}/breadmill-x86_64.sha256" \
+            "${PKG_DIR}/onnxruntime-LICENSE.txt" \
+            "${PKG_DIR}/onnxruntime-ThirdPartyNotices.txt" \
             --clobber

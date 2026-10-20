@@ -198,8 +198,8 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
         // Full-screen transparent overlay; panel widget is positioned inside it.
         let window = bread_utils::gtk_popup::new_overlay_window(app, "breadsearch");
         // Bind the *app* sheet, not just the shared one. `bind_window_auto`
-        // alone re-broadcasts the shared component sheet — including
-        // `window { background-color: @bg }` — at USER-10, outranking the
+        // alone re-broadcasts the shared component sheet, including
+        // `window { background-color: @bg }`, at USER-10, outranking the
         // APPLICATION-priority `window { background-color: transparent }` here
         // regardless of specificity: the "transparent overlay" then paints a
         // solid @bg rectangle over the whole screen (worst under a VM's
@@ -222,7 +222,7 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
         vbox.set_size_request(640, -1);
 
         let search = SearchEntry::new();
-        search.set_placeholder_text(Some("breadsearch — find anything by meaning"));
+        search.set_placeholder_text(Some("breadsearch: find anything by meaning"));
         vbox.append(&search);
 
         let scroll = ScrolledWindow::new();
@@ -273,7 +273,7 @@ fn run_ui(screenshot_req: Option<screenshot::ScreenshotRequest>) {
                 });
 
                 // Wait for the thread's result on a bounded timer rather than
-                // an `idle_add_local` — an idle source has no wait condition
+                // an `idle_add_local`: an idle source has no wait condition
                 // of its own, so GLib re-invokes it on every single main-loop
                 // iteration, i.e. a busy-spin pinning a full CPU core for as
                 // long as the daemon takes to answer (normally sub-ms, but
@@ -396,13 +396,13 @@ fn main() {
     let cli = screenshot::Cli::parse();
     let screenshot_req = cli.screenshot_request();
 
-    // `toggle_or_kill` kills whatever's holding the single-instance lock —
+    // `toggle_or_kill` kills whatever's holding the single-instance lock,
     // a real, already-running breadsearch included. A screenshot run must
     // never touch it: it's a separate, disposable instance by design (same
     // reasoning as breadbar's `allow_multiple_instances`), not a toggle of
     // the operator's real search panel.
     //
-    // Kept alive for the rest of `main` — dropping it releases the
+    // Kept alive for the rest of `main`: dropping it releases the
     // single-instance lock and removes the pid file, which happens
     // naturally once `run_ui` returns (after the window closes).
     let _singleton_guard = if screenshot_req.is_some() {

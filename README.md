@@ -1,13 +1,13 @@
 # breadsearch
 
-Semantic document search for Bread OS. Type a concept — not a keyword — and get ranked hits from your documents.
+Semantic document search for Bread OS. Type a concept, not a keyword, and get ranked hits from your documents.
 
-This is **not** [breadbox](https://git.breadway.dev/Breadway/breadbox). breadsearch is document/meaning search over your files; breadbox is the app launcher (fuzzy `.desktop` launch). They are separate overlays with separate binaries, sockets, and keybinds — even though the search panel was originally forked from breadbox's launcher UI.
+This is **not** [breadbox](https://git.breadway.dev/Breadway/breadbox). breadsearch is document/meaning search over your files; breadbox is the app launcher (fuzzy `.desktop` launch). They are separate overlays with separate binaries, sockets, and keybinds, even though the search panel was originally forked from breadbox's launcher UI.
 
 Two binaries in one Cargo workspace:
 
-- **breadmill** — background daemon. Walks configured directories, extracts text, chunks and embeds documents with [nomic-embed-text-v1.5](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5) (768-dim ONNX), stores vectors in an HNSW index (usearch) backed by SQLite metadata, and serves queries over a Unix socket. Watches for filesystem changes and re-indexes incrementally.
-- **breadsearch** — GTK4 overlay GUI. Queries breadmill via the Unix socket and shows ranked results. Press Enter to open a file, Ctrl+Enter to reveal its folder, Esc to close. Bind it to a hotkey (e.g. Super+/) and invoke it as a toggle.
+- **breadmill**: background daemon. Walks configured directories, extracts text, chunks and embeds documents with [nomic-embed-text-v1.5](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5) (768-dim ONNX), stores vectors in an HNSW index (usearch) backed by SQLite metadata, and serves queries over a Unix socket. Watches for filesystem changes and re-indexes incrementally.
+- **breadsearch**: GTK4 overlay GUI. Queries breadmill via the Unix socket and shows ranked results. Press Enter to open a file, Ctrl+Enter to reveal its folder, Esc to close. Bind it to a hotkey (e.g. Super+/) and invoke it as a toggle.
 
 ## Build
 
@@ -17,7 +17,7 @@ System dependencies: `gtk4`, `gtk4-layer-shell`, `librsvg`.
 cargo build --release
 ```
 
-The `ort` crate downloads a bundled ONNX Runtime at build time (no system `onnxruntime` needed for the default CPU build).
+The breadmill build downloads the CPU ONNX Runtime 1.28.0 library at build time and embeds it in the binary. On first model load, breadmill installs it into `~/.cache/breadsearch/runtime/` and uses it by default, so no system `onnxruntime` package is required. Set `ORT_DYLIB_PATH` to override the bundled CPU runtime with a provider-enabled runtime for an optional accelerator.
 
 Optional features:
 
@@ -46,21 +46,20 @@ cargo build --release -p breadmill --features openvino
 cargo build --release -p breadmill --features full
 ```
 
-`rocm`/`cuda`/`npu`/`openvino` all use `ort`'s `load-dynamic` mode: at runtime,
-breadmill dlopens whatever `libonnxruntime.so` the dynamic linker resolves (or
-`ORT_DYLIB_PATH` if set). GPU acceleration only works if that ONNX Runtime
-build actually has the matching execution provider compiled in — breadmill
-logs a clear `Successfully registered` / `not enabled in this build` line for
-this at startup (see [GPU backend notes](#gpu-backend-notes) below).
+`rocm`/`cuda`/`npu`/`openvino` use `ort`'s `load-dynamic` mode. By default,
+breadmill loads the bundled CPU runtime. To use an accelerator, set
+`ORT_DYLIB_PATH` to a compatible ONNX Runtime build with that execution
+provider compiled in. breadmill logs provider registration results at startup
+(see [GPU backend notes](#gpu-backend-notes) below).
 
 Because all four are dlopen-based, `full` doesn't require the NPU/ROCm/CUDA/
-OpenVINO toolkits to be installed at build time — only at run time, and only
+OpenVINO toolkits to be installed at build time; only at run time, and only
 for whichever single backend you actually select via
 `--npu`/`--rocm`/`--cuda`/`--openvino` or `backend` in config.toml. The
 **released binaries are built with `full`**: same binary works CPU-only out
-of the box, and picks up NPU/ROCm/CUDA/OpenVINO acceleration on a machine
-that has the matching ONNX Runtime available, without needing a different
-download. An explicit `--npu`/`--rocm`/`--cuda`/`--openvino` flag always
+of the box, and can use NPU/ROCm/CUDA/OpenVINO acceleration when
+`ORT_DYLIB_PATH` points to a matching provider-enabled ONNX Runtime, without
+needing a different breadmill binary. An explicit `--npu`/`--rocm`/`--cuda`/`--openvino` flag always
 overrides `backend` in config.toml, not the other way around.
 
 ## Setup
@@ -83,7 +82,7 @@ systemctl --user enable --now breadmill
 
 Or run it directly: `breadmill serve` (or just `breadmill`).
 
-**3. Copy the example config** (optional — built-in defaults are used otherwise):
+**3. Copy the example config** (optional, built-in defaults are used otherwise):
 
 ```
 mkdir -p ~/.config/breadsearch
@@ -129,7 +128,7 @@ breadmill --openvino
 
 ## Config
 
-`~/.config/breadsearch/config.toml` — all keys are optional; built-in defaults are shown.
+`~/.config/breadsearch/config.toml`: all keys are optional; built-in defaults are shown.
 
 ```toml
 [index]
@@ -162,11 +161,10 @@ Set `backend = "npu"` in config (or pass `--npu`) when running a build compiled 
 
 ### GPU backend notes
 
-`rocm`, `cuda`, and `openvino` all need a system ONNX Runtime that was
-actually built with the matching execution provider — the crate's own
-downloaded binary is CPU-only. Point `ORT_DYLIB_PATH` at one, or install a
-distro package that provides `libonnxruntime.so` with the EP baked in and
-let the dynamic linker find it.
+`rocm`, `cuda`, and `openvino` need an ONNX Runtime that was built with the
+matching execution provider. By default breadmill uses its bundled CPU
+runtime; it does not discover a system runtime through the dynamic linker.
+Set `ORT_DYLIB_PATH` to a provider-enabled library to opt into acceleration.
 
 **ROCm (`--rocm` / `backend = "rocm"`)** targets ONNX Runtime's **MIGraphX**
 execution provider, not the classic `ROCMExecutionProvider`. Distro
@@ -175,7 +173,7 @@ commonly built with `--use_migraphx` rather than `--use_rocm`, so this is the
 EP that's actually available in practice; the classic ROCm EP needs a bespoke
 `--use_rocm` build most distros don't package. Startup logs a
 `Successfully registered `MIGraphXExecutionProvider`` line when it's really
-active — check for it if in doubt, since a failed GPU EP registration falls
+active: check for it if in doubt, since a failed GPU EP registration falls
 back to CPU silently at the ONNX Runtime level (breadmill's own log line is
 only a statement of intent, not a confirmation).
 
@@ -184,25 +182,25 @@ the compiled kernel to disk (each compile takes ~60–120s and produces a
 ~500MB `.mxr` file). Set `ORT_MIGRAPHX_MODEL_CACHE_PATH=/path/to/cache` so
 that cost is paid once per shape instead of on every daemon restart. Because
 query text length varies, expect an occasional multi-second stall the first
-time a new token length is seen — fine for background document indexing,
+time a new token length is seen: fine for background document indexing,
 noticeable for interactive query embedding.
 
 **CUDA (`--cuda` / `backend = "cuda"`)** targets the standard
 `CUDAExecutionProvider` and needs a CUDA-enabled ONNX Runtime + a working
-CUDA/cuDNN install. Unverified on real NVIDIA hardware in this repo — only
+CUDA/cuDNN install. Unverified on real NVIDIA hardware in this repo: only
 compile-checked, since development happened on an AMD-only machine.
 
 **OpenVINO (`--openvino` / `backend = "openvino"`)** targets
 `OpenVINOExecutionProvider` with `device_type = "GPU"`, covering both Intel
 iGPUs and Arc dGPUs through the same EP (OpenVINO abstracts Intel's whole
-hardware line — CPU/GPU/NPU — behind one provider and a device-type string).
+hardware line, CPU/GPU/NPU, behind one provider and a device-type string).
 Needs an OpenVINO-enabled ONNX Runtime and the OpenVINO runtime itself
 installed. Its options go through a generic key/value FFI interface rather
 than a fixed C struct (unlike MIGraphX's `OrtMIGraphXProviderOptions`), so it
-should be less exposed to the kind of ABI-version-skew crash MIGraphX hit —
+should be less exposed to the kind of ABI-version-skew crash MIGraphX hit,
 but that's inference from reading the EP's design, not something verified
 against real Intel GPU hardware. Also unverified on real hardware in this
-repo — only compile-checked, for the same reason as CUDA.
+repo: only compile-checked, for the same reason as CUDA.
 
 ## Runtime paths
 

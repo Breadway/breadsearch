@@ -56,6 +56,7 @@ pub fn load_in_background(state: &Arc<SharedState>, params: &ModelParams) {
     if state.loading.swap(true, Ordering::Relaxed) {
         return;
     }
+    *state.model_error.lock_recover() = None;
     let state = Arc::clone(state);
     let params = params.clone();
     std::thread::spawn(move || {
@@ -77,6 +78,7 @@ pub fn load_in_background(state: &Arc<SharedState>, params: &ModelParams) {
                 eprintln!("breadmill: model loaded");
             }
             Err(e) => {
+                *state.model_error.lock_recover() = Some(e.clone());
                 state.loading.store(false, Ordering::Relaxed);
                 eprintln!("breadmill: model load failed: {e}");
             }

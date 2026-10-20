@@ -57,10 +57,14 @@ fn handle(stream: UnixStream, state: Arc<SharedState>, snippet_len: usize, searc
             }));
             match r {
                 Ok(resp) => resp,
-                Err(_) => Response::Error { message: "internal error".into() },
+                Err(_) => Response::Error {
+                    message: "internal error".into(),
+                },
             }
         }
-        Err(e) => Response::Error { message: e.to_string() },
+        Err(e) => Response::Error {
+            message: e.to_string(),
+        },
     };
 
     if let Ok(mut json) = serde_json::to_string(&response) {
@@ -91,12 +95,12 @@ fn dispatch(
                     Some(params) if params.model_path.exists() => {
                         crate::model::load_in_background(state, &params);
                         return Response::Error {
-                            message: "model loading — retry shortly".into(),
+                            message: "model loading, retry shortly".into(),
                         };
                     }
                     _ => {
                         return Response::Error {
-                            message: "model not ready — run breadmill --fetch-model".into(),
+                            message: "model not ready, run breadmill --fetch-model".into(),
                         };
                     }
                 }
@@ -133,21 +137,20 @@ fn dispatch(
             }
         }
 
-        Request::Status => {
-            Response::StatusInfo(StatusInfo {
-                indexed: state.indexed.load(Ordering::Relaxed),
-                pending: state.pending.load(Ordering::Relaxed),
-                model_ready: state.model_ready.load(Ordering::Relaxed),
-                in_flight: state.in_flight.load(Ordering::Relaxed),
-                loading: state.loading.load(Ordering::Relaxed),
-                model_bytes: match state.model_bytes.load(Ordering::Relaxed) {
-                    0 => None,
-                    bytes => Some(bytes),
-                },
-                version: Some(env!("CARGO_PKG_VERSION").to_string()),
-                queries_served: Some(state.queries_served.load(Ordering::Relaxed)),
-            })
-        }
+        Request::Status => Response::StatusInfo(StatusInfo {
+            indexed: state.indexed.load(Ordering::Relaxed),
+            pending: state.pending.load(Ordering::Relaxed),
+            model_ready: state.model_ready.load(Ordering::Relaxed),
+            in_flight: state.in_flight.load(Ordering::Relaxed),
+            loading: state.loading.load(Ordering::Relaxed),
+            model_bytes: match state.model_bytes.load(Ordering::Relaxed) {
+                0 => None,
+                bytes => Some(bytes),
+            },
+            version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            queries_served: Some(state.queries_served.load(Ordering::Relaxed)),
+            model_error: state.model_error.lock_recover().clone(),
+        }),
 
         Request::Reindex => {
             state.reindex_signal.store(true, Ordering::Relaxed);

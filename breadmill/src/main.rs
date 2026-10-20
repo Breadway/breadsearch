@@ -115,7 +115,7 @@ fn run_daemon(
     std::fs::create_dir_all(&state_dir).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
 
-    // CLI flags always override config — otherwise an explicit --cuda/--npu on
+    // CLI flags always override config, otherwise an explicit --cuda/--npu on
     // the command line would silently lose to an unrelated `backend = "..."`
     // already sitting in config.toml, since that's whatever earlier branch a
     // fixed if/else-if priority order happened to check first.
@@ -134,7 +134,9 @@ fn run_daemon(
     let backend = match backend_name {
         "npu" => {
             eprintln!("breadmill: NPU backend selected");
-            Backend::Npu { cache_dir: cache_dir.clone() }
+            Backend::Npu {
+                cache_dir: cache_dir.clone(),
+            }
         }
         "rocm" => {
             eprintln!("breadmill: ROCm backend selected");
@@ -146,7 +148,9 @@ fn run_daemon(
         }
         "openvino" => {
             eprintln!("breadmill: OpenVINO backend selected");
-            Backend::OpenVino { cache_dir: cache_dir.clone() }
+            Backend::OpenVino {
+                cache_dir: cache_dir.clone(),
+            }
         }
         _ => Backend::Cpu,
     };
@@ -154,7 +158,7 @@ fn run_daemon(
     let store = Store::open(&state_dir, dim)?;
     let state = Arc::new(SharedState::new(store));
 
-    // Load the embedder on a background thread — an OpenVINO/CUDA/etc EP
+    // Load the embedder on a background thread: an OpenVINO/CUDA/etc EP
     // compile can take minutes or hang outright, and doing this inline used
     // to block the socket bind below until it finished. That turned "model
     // still loading" into an indistinguishable "connection refused" for
@@ -178,8 +182,12 @@ fn run_daemon(
         *state.loader.lock_recover() = Some(params.clone());
         model::load_in_background(&state, &params);
     } else {
+        *state.model_error.lock_recover() = Some(format!(
+            "model files not found in {}, run: breadmill --fetch-model",
+            model_dir.display()
+        ));
         eprintln!(
-            "breadmill: model files not found in {} — run: breadmill --fetch-model",
+            "breadmill: model files not found in {}, run: breadmill --fetch-model",
             model_dir.display()
         );
     }
@@ -225,7 +233,7 @@ fn download_if_missing(url: &str, dest: &Path) -> Result<(), String> {
         return Ok(());
     }
     // Shared with breadarrd's own (previously reqwest/async, now also this
-    // same sync/ureq implementation) model downloader — see
+    // same sync/ureq implementation) model downloader, see
     // bread_onnx::download's doc comment.
     bread_onnx::download::ensure_file(url, dest, None).map_err(|e| e.to_string())?;
     Ok(())
@@ -270,6 +278,9 @@ fn cli_status() {
             println!("indexed:     {}", s.indexed);
             println!("pending:     {}", s.pending);
             println!("model ready: {}", s.model_ready);
+            if let Some(error) = s.model_error {
+                println!("model error: {error}");
+            }
         }
         Ok(_) => eprintln!("unexpected response"),
         Err(e) => eprintln!("could not reach breadmill: {}", e),
