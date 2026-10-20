@@ -20,6 +20,8 @@ pub struct SharedState {
     /// this is nonzero; indexing work is tracked by `pending` instead and
     /// needs no refusal because it stops cleanly when the model disappears.
     pub in_flight: AtomicUsize,
+    /// Total queries that entered an embedding call since the daemon started, never reset by unload or reload.
+    pub queries_served: AtomicU64,
     /// A background model load is running. Set before the thread spawns and
     /// cleared when it finishes, so two triggers cannot start two loads.
     pub loading: AtomicBool,
@@ -40,6 +42,7 @@ impl SharedState {
             embedder: Mutex::new(None),
             model_ready: AtomicBool::new(false),
             in_flight: AtomicUsize::new(0),
+            queries_served: AtomicU64::new(0),
             loading: AtomicBool::new(false),
             model_bytes: AtomicU64::new(0),
             loader: Mutex::new(None),

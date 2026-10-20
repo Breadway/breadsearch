@@ -103,6 +103,7 @@ fn dispatch(
             }
 
             state.in_flight.fetch_add(1, Ordering::Relaxed);
+            state.queries_served.fetch_add(1, Ordering::Relaxed);
             let embedding = {
                 let mut embedder = state.embedder.lock_recover();
                 match embedder.as_mut() {
@@ -144,6 +145,7 @@ fn dispatch(
                     bytes => Some(bytes),
                 },
                 version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                queries_served: Some(state.queries_served.load(Ordering::Relaxed)),
             })
         }
 

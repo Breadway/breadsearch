@@ -259,6 +259,9 @@ pub struct StatusInfo {
     /// exactly how a client tells them apart from one with unload verbs.
     #[serde(default)]
     pub version: Option<String>,
+    /// Total queries the daemon has served since it started. Absent on older daemons.
+    #[serde(default)]
+    pub queries_served: Option<u64>,
 }
 
 // ---- Socket client ----------------------------------------------------------
