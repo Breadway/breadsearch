@@ -157,7 +157,6 @@ impl Default for ModelConfig {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PowerConfig {
     /// Master on/off switch for indexing (embedding). When false, breadmill
@@ -211,9 +210,19 @@ impl Config {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Request {
-    Query { query: String, limit: usize },
+    Query {
+        query: String,
+        limit: usize,
+    },
     Status,
     Reindex,
+    /// Drop the loaded model session, freeing its backend allocations.
+    /// Refused while queries are in flight. Unknown to older daemons, which
+    /// answer a parse error: that is how a client tells them apart.
+    UnloadModel,
+    /// Load (or reload) the model in the background. Accepted even when a
+    /// load is already running; readiness is polled through `Status`.
+    LoadModel,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -238,6 +247,23 @@ pub struct StatusInfo {
     pub indexed: usize,
     pub pending: usize,
     pub model_ready: bool,
+    /// Queries currently inside an embedding call. Absent on older daemons.
+    #[serde(default)]
+    pub in_flight: usize,
+    /// A background model load is running. Absent on older daemons.
+    #[serde(default)]
+    pub loading: bool,
+    /// The model file size in bytes from the last load, if one happened.
+    /// Absent on older daemons.
+    #[serde(default)]
+    pub model_bytes: Option<u64>,
+    /// The daemon version that answered. Absent on older daemons, which is
+    /// exactly how a client tells them apart from one with unload verbs.
+    #[serde(default)]
+    pub version: Option<String>,
+    /// Total queries the daemon has served since it started. Absent on older daemons.
+    #[serde(default)]
+    pub queries_served: Option<u64>,
     #[serde(default)]
     pub model_error: Option<String>,
 }
@@ -257,4 +283,34 @@ pub fn send_request(req: &Request) -> std::io::Result<Response> {
 
     serde_json::from_str(response.trim())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn status_from_older_daemon_defaults_lifecycle_fields() {
+        let status: StatusInfo =
+            serde_json::from_str(r#"{"indexed":2,"pending":0,"model_ready":true}"#).unwrap();
+        assert_eq!(status.in_flight, 0);
+        assert!(!status.loading);
+        assert!(status.model_bytes.is_none());
+        assert!(status.version.is_none());
+        assert!(status.queries_served.is_none());
+        assert!(status.model_error.is_none());
+    }
+
+    #[test]
+    fn status_preserves_lifecycle_fields_and_model_errors() {
+        let response: Response = serde_json::from_str(
+            r#"{"type":"status_info","indexed":2,"pending":0,"model_ready":false,"in_flight":0,"loading":false,"model_bytes":400,"version":"0.3.3","queries_served":7,"model_error":"load failed"}"#,
+        )
+        .unwrap();
+        let encoded = serde_json::to_value(response).unwrap();
+        assert_eq!(encoded["model_error"], "load failed");
+        assert_eq!(encoded["model_bytes"], 400);
+        assert_eq!(encoded["queries_served"], 7);
+        assert_eq!(encoded["version"], "0.3.3");
+    }
 }

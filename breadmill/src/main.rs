@@ -1,6 +1,6 @@
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, atomic::Ordering},
+    sync::Arc,
 };
 
 use breadsearch_shared::{Request, Response};
@@ -9,12 +9,13 @@ mod chunk;
 mod embed;
 mod extract;
 mod indexer;
+mod model;
 mod power;
 mod serve;
 mod store;
 mod sync_ext;
 
-use embed::{Backend, OrtEmbedder};
+use embed::Backend;
 use indexer::{Indexer, SharedState};
 use store::Store;
 use sync_ext::MutexExt;
@@ -133,7 +134,9 @@ fn run_daemon(
     let backend = match backend_name {
         "npu" => {
             eprintln!("breadmill: NPU backend selected");
-            Backend::Npu { cache_dir: cache_dir.clone() }
+            Backend::Npu {
+                cache_dir: cache_dir.clone(),
+            }
         }
         "rocm" => {
             eprintln!("breadmill: ROCm backend selected");
@@ -145,7 +148,9 @@ fn run_daemon(
         }
         "openvino" => {
             eprintln!("breadmill: OpenVINO backend selected");
-            Backend::OpenVino { cache_dir: cache_dir.clone() }
+            Backend::OpenVino {
+                cache_dir: cache_dir.clone(),
+            }
         }
         _ => Backend::Cpu,
     };
@@ -166,21 +171,16 @@ fn run_daemon(
     let tokenizer_path = model_dir.join("tokenizer.json");
 
     if model_path.exists() && tokenizer_path.exists() {
-        let state_clone = Arc::clone(&state);
-        std::thread::spawn(move || {
-            eprintln!("breadmill: loading model...");
-            match OrtEmbedder::load(&model_path, &tokenizer_path, dim, backend) {
-                Ok(embedder) => {
-                    *state_clone.embedder.lock_recover() = Some(embedder);
-                    state_clone.model_ready.store(true, Ordering::Relaxed);
-                    eprintln!("breadmill: model loaded");
-                }
-                    Err(e) => {
-                    *state_clone.model_error.lock_recover() = Some(e.clone());
-                    eprintln!("breadmill: model unavailable: {e}");
-                }
-            }
-        });
+        // Captured once so later queries, explicit loads, and demand reloads
+        // all start the same background load.
+        let params = model::ModelParams {
+            model_path,
+            tokenizer_path,
+            dim,
+            backend,
+        };
+        *state.loader.lock_recover() = Some(params.clone());
+        model::load_in_background(&state, &params);
     } else {
         *state.model_error.lock_recover() = Some(format!(
             "model files not found in {}, run: breadmill --fetch-model",
