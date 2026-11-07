@@ -83,7 +83,7 @@ fn handle(stream: UnixStream, state: Arc<SharedState>, snippet_len: usize, searc
 fn record_query_received(state: &SharedState) {
     let _ = state
         .queries_served
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |served| {
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |served| {
             Some(served.saturating_add(1))
         });
 }
