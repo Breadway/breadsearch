@@ -23,7 +23,9 @@ pub struct SharedState {
     /// this is nonzero; indexing work is tracked by `pending` instead and
     /// needs no refusal because it stops cleanly when the model disappears.
     pub in_flight: AtomicUsize,
-    /// Total queries that entered an embedding call since the daemon started, never reset by unload or reload.
+    /// Total queries received since the daemon started, counted at dispatch
+    /// entry even when the model is unloaded and the query only triggers a
+    /// demand reload. Never reset by unload or reload.
     pub queries_served: AtomicU64,
     /// A background model load is running. Set before the thread spawns and
     /// cleared when it finishes, so two triggers cannot start two loads.
