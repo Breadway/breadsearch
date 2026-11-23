@@ -1,4 +1,4 @@
-# breadsearch: bread event integration
+# search: bread event integration
 
 breadsearch is a standalone document-search overlay: it works exactly the
 same with or without `breadd` running. When breadd *is* present, the
@@ -41,7 +41,7 @@ bread.spawn(function()
 end)
 ```
 
-### Not implemented: extra verbs
+## Not implemented
 
 There is no `query` / `close` / `reindex` command verb. breadmill already
 has its own query socket; inventing a bus query plane would be a new
