@@ -1,4 +1,4 @@
-# breadsearch: bread event integration
+# search: bread event integration
 
 breadsearch is a standalone document-search overlay: it works exactly the
 same with or without `breadd` running. When breadd *is* present, the
